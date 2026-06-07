@@ -16,6 +16,7 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import * as nodemailer from 'nodemailer';
 import { JwtService } from '@nestjs/jwt';
+import { AdminService } from '../admin/admin.service';
 
 @Injectable()
 export class AuthService {
@@ -173,42 +174,33 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
-  async login(dto: LoginDto) {
-    const user =
-      await this.prisma.user.findUnique({
-        where: {
-          email: dto.email,
-        },
+  async login(dto: LoginDto, ip?: string) {
+    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    const isPasswordValid = await bcrypt.compare(dto.password, user.password);
+    if (!isPasswordValid) throw new UnauthorizedException('Invalid credentials');
+
+    const token = await this.jwtService.signAsync({ sub: user.id, email: user.email });
+
+    // Track login IP + country (non-blocking)
+    if (ip) {
+      AdminService.lookupIp(ip).then((geo) => {
+        this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lastLoginIp: ip,
+            lastLoginAt: new Date(),
+            ...(geo ? { country: geo.country, city: geo.city } : {}),
+          },
+        }).catch(() => {});
       });
-
-    if (!user) {
-      throw new UnauthorizedException(
-        'Invalid credentials',
-      );
     }
-
-    const isPasswordValid =
-      await bcrypt.compare(
-        dto.password,
-        user.password,
-      );
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException(
-        'Invalid credentials',
-      );
-    }
-
-    const token =
-      await this.jwtService.signAsync({
-        sub: user.id,
-        email: user.email,
-      });
 
     return {
       message: 'Login successful',
       token,
-      user: { id: user.id, email: user.email, fullName: user.fullName },
+      user: { id: user.id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin },
     };
   }
 

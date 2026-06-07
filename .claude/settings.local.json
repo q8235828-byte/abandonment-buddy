@@ -10,7 +10,8 @@
       "Bash(git push *)",
       "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(64\\).toString\\('hex'\\)\\)\")",
       "Bash(git pull *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(pnpm --filter web build)"
     ],
     "additionalDirectories": [
       "c:\\Users\\WC\\Projects\\abandonment-buddy\\apps\\api\\.git"

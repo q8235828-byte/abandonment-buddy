@@ -18,6 +18,7 @@ import { QueueModule } from './queues/queue.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CampaignsModule } from './campaigns/campaigns.module';
 import { BillingModule } from './billing/billing.module';
+import { AdminModule } from './admin/admin.module';
 
 
 @Module({
@@ -36,6 +37,7 @@ import { BillingModule } from './billing/billing.module';
     DashboardModule,
     CampaignsModule,
     BillingModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

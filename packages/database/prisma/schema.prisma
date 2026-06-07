@@ -66,6 +66,19 @@ model User {
   whatsappUsed   Int      @default(0)
   usageResetAt   DateTime @default(now())
 
+  // Custom limits (admin override)
+  customOrderLimit    Int?
+  customEmailLimit    Int?
+  customSmsLimit      Int?
+  customWhatsappLimit Int?
+
+  // Admin & tracking
+  isAdmin       Boolean  @default(false)
+  lastLoginIp   String?
+  lastLoginAt   DateTime?
+  country       String?
+  city          String?
+
   stores   Store[]
   payments Payment[]
 }
