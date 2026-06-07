@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Layers, Plus, Search, Store as StoreIcon, XCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Download, Layers, Plus, Search, Store as StoreIcon, XCircle } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Alert, EmptyState, LoadingRow, StatCard, StatusBadge } from '../components/Ui';
 import { api, getApiErrorMessage } from '../lib/api';
@@ -69,6 +69,28 @@ export default function StoresPage() {
           <StatCard label="Total stores"  value={stores.length}              helper="Stores in this workspace"  icon={<Layers size={18} />}       color="slate" />
           <StatCard label="Connected"     value={connectedCount}             helper="Ready for webhooks"        icon={<CheckCircle2 size={18} />} color="teal" />
           <StatCard label="Disconnected"  value={stores.length - connectedCount} helper="Need credential setup" icon={<XCircle size={18} />}      color="amber" />
+        </section>
+
+        {/* Plugin download banner */}
+        <section className="rounded-2xl border border-teal-200 bg-teal-50 p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500 text-white">
+                <Download size={18} />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900">WordPress Plugin</p>
+                <p className="text-xs text-slate-500">Download, install in WordPress, then connect using your store credentials below.</p>
+              </div>
+            </div>
+            <a
+              href="/api/download-plugin"
+              download="abandonment-buddy.zip"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
+            >
+              <Download size={15} /> Download Plugin v1.1.0
+            </a>
+          </div>
         </section>
 
         {/* Add store */}

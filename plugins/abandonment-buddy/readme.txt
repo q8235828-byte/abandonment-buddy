@@ -1,0 +1,40 @@
+=== Abandonment Buddy for WooCommerce ===
+Contributors: abandonmentbuddy
+Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
+Requires at least: 5.8
+Tested up to: 6.7
+Requires PHP: 7.4
+Stable tag: 1.1.0
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+
+Automatically track and recover abandoned WooCommerce carts via email, WhatsApp, and SMS.
+
+== Description ==
+
+Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS platform.
+
+= Features =
+* Real-time cart tracking stored in local WordPress database
+* Automatic sync to Abandonment Buddy cloud every 5 minutes
+* Email, WhatsApp, and SMS recovery campaigns
+* Captures customer email, name, phone, and full cart contents
+* Marks carts as recovered when order is placed
+
+== Installation ==
+
+1. Upload the `abandonment-buddy` folder to `/wp-content/plugins/`
+2. Activate the plugin in WordPress admin
+3. Go to WooCommerce → Abandonment Buddy
+4. Enter your API URL, Store ID, API Key, and API Secret from your Abandonment Buddy dashboard
+5. Click "Save & Connect"
+
+== Changelog ==
+
+= 1.1.0 =
+* Local WordPress DB storage for cart sessions
+* Non-blocking API sync
+* Email capture at checkout
+
+= 1.0.0 =
+* Initial release
