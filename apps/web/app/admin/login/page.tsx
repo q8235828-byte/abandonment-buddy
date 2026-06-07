@@ -17,12 +17,19 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setLoading(true); setError('');
     try {
-      const res = await api.post<{ token: string; user: { isAdmin: boolean; email: string } }>('/auth/login', { email, password });
-      if (!res.data.user.isAdmin) {
+      // Step 1: Login
+      const res = await api.post<{ token: string; user: any }>('/auth/login', { email, password });
+      localStorage.setItem('token', res.data.token);
+
+      // Step 2: Verify admin access by calling a protected admin endpoint
+      try {
+        await api.get('/admin/stats');
+      } catch {
+        localStorage.removeItem('token');
         setError('Access denied. This account does not have admin privileges.');
         return;
       }
-      localStorage.setItem('token', res.data.token);
+
       localStorage.setItem('user', JSON.stringify(res.data.user));
       router.push('/admin');
     } catch (err) {
