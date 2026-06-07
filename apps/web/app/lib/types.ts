@@ -13,6 +13,12 @@ export type Store = {
   webhookSecret?: string;
   status: 'CONNECTED' | 'DISCONNECTED';
   abandonmentTimeoutMin: number;
+  smtpHost?: string | null;
+  smtpPort?: number | null;
+  smtpUser?: string | null;
+  smtpFrom?: string | null;
+  smtpSecure?: boolean | null;
+  smtpVerified?: boolean | null;
   createdAt: string;
   updatedAt: string;
 };

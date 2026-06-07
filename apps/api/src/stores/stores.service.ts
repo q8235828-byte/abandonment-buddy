@@ -66,17 +66,19 @@ async updateEmailSettings(storeId: string, userId: string, dto: any) {
   });
   if (!store) throw new BadRequestException('Store not found');
 
+  const data: any = {
+    smtpHost: dto.smtpHost,
+    smtpPort: Number(dto.smtpPort) || 587,
+    smtpUser: dto.smtpUser,
+    smtpFrom: dto.smtpFrom || dto.smtpUser,
+    smtpSecure: dto.smtpSecure === true || dto.smtpSecure === 'true',
+    smtpVerified: false,
+  };
+  if (dto.smtpPass) data.smtpPass = dto.smtpPass;
+
   return this.prisma.store.update({
     where: { id: storeId },
-    data: {
-      smtpHost: dto.smtpHost,
-      smtpPort: Number(dto.smtpPort) || 587,
-      smtpUser: dto.smtpUser,
-      smtpPass: dto.smtpPass,
-      smtpFrom: dto.smtpFrom || dto.smtpUser,
-      smtpSecure: dto.smtpSecure === true || dto.smtpSecure === 'true',
-      smtpVerified: false,
-    },
+    data,
     select: {
       id: true, smtpHost: true, smtpPort: true,
       smtpUser: true, smtpFrom: true, smtpSecure: true, smtpVerified: true,

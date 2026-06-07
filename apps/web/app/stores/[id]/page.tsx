@@ -164,6 +164,20 @@ export default function StoreDetailsPage() {
 
   useEffect(() => { void fetchStores(); }, []);
 
+  // Pre-fill email fields when store data loads
+  useEffect(() => {
+    if (store) {
+      if (store.smtpUser) setSmtpUser(store.smtpUser);
+      if (store.smtpFrom) setSmtpFrom(store.smtpFrom);
+      if (store.smtpVerified) setEmailVerified(true);
+      // Detect provider from host
+      if (store.smtpHost?.includes('gmail')) setEmailProvider('gmail');
+      else if (store.smtpHost?.includes('office365') || store.smtpHost?.includes('outlook')) setEmailProvider('outlook');
+      else if (store.smtpHost?.includes('yahoo')) setEmailProvider('yahoo');
+      else if (store.smtpHost) setEmailProvider('custom');
+    }
+  }, [store]);
+
   const connectStore = async () => {
     if (!store?.apiKey || !store?.apiSecret) return;
     try {
@@ -200,14 +214,15 @@ export default function StoreDetailsPage() {
     setEmailMessage('');
     try {
       const p = PROVIDERS[emailProvider];
-      await api.patch(`/stores/${storeId}/email-settings`, {
+      const payload: Record<string, unknown> = {
         smtpHost: emailProvider === 'custom' ? smtpUser : p.host,
         smtpPort: p.port,
         smtpSecure: p.secure,
         smtpUser,
-        smtpPass,
         smtpFrom: smtpFrom || smtpUser,
-      });
+      };
+      if (smtpPass) payload.smtpPass = smtpPass; // only send if changed
+      await api.patch(`/stores/${storeId}/email-settings`, payload);
       setEmailMessage('Email settings saved. Click "Send test email" to verify.');
     } catch (err) {
       setEmailError(getApiErrorMessage(err, 'Failed to save email settings'));
@@ -425,11 +440,18 @@ export default function StoreDetailsPage() {
                 <h2 className="font-semibold text-slate-900">Recovery email sender</h2>
                 <p className="text-xs text-slate-400">Connect your Gmail or other email to send abandoned cart follow-ups</p>
               </div>
-              {emailVerified && (
-                <span className="ml-auto flex items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-600">
-                  <CheckCircle2 size={12} /> Verified
-                </span>
-              )}
+              <div className="ml-auto flex items-center gap-2">
+                {store.smtpUser && !emailVerified && (
+                  <span className="flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-600">
+                    Configured — not verified
+                  </span>
+                )}
+                {emailVerified && (
+                  <span className="flex items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-600">
+                    <CheckCircle2 size={12} /> Verified
+                  </span>
+                )}
+              </div>
             </div>
 
             {emailError && (
@@ -489,8 +511,7 @@ export default function StoreDetailsPage() {
                     type="password"
                     value={smtpPass}
                     onChange={(e) => setSmtpPass(e.target.value)}
-                    placeholder={emailProvider === 'gmail' ? 'xxxx xxxx xxxx xxxx' : '••••••••'}
-                    required
+                    placeholder={store.smtpUser ? '••• saved — enter new to change •••' : (emailProvider === 'gmail' ? 'xxxx xxxx xxxx xxxx' : '••••••••')}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
                   />
                 </div>
