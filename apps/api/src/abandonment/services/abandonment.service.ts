@@ -15,13 +15,18 @@ export class AbandonmentService {
 
   // Runs every 10 minutes automatically
   @Cron(CronExpression.EVERY_10_MINUTES)
-  async checkAbandonedOrders() {
+  async checkAbandonedOrdersCron() {
+    return this.checkAbandonedOrders();
+  }
+
+  async checkAbandonedOrders(userId?: string) {
     const orders = await this.prisma.abandonedOrder.findMany({
       where: {
         isAbandoned: false,
         emailSentAt: null,
         orderStatus: { in: ['pending', 'on-hold', 'failed'] },
         customerEmail: { not: null },
+        ...(userId ? { store: { ownerId: userId } } : {}),
       },
       include: { store: true },
     });
@@ -54,8 +59,9 @@ export class AbandonmentService {
     return { checked: orders.length, abandoned: queued.length, queued };
   }
 
-  async getOrders() {
+  async getOrders(userId: string) {
     return this.prisma.abandonedOrder.findMany({
+      where: { store: { ownerId: userId } },
       orderBy: { createdAt: 'desc' },
       include: { store: true },
     });
