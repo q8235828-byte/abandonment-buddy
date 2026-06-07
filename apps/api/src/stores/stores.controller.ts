@@ -2,7 +2,9 @@ import {
 Controller,
 Post,
 Get,
+Patch,
 Body,
+Param,
 UseGuards,
 } from '@nestjs/common';
 
@@ -68,5 +70,26 @@ user: any,
 return this.storesService.getStores(
 user.userId,
 );
+}
+
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Patch(':id/email-settings')
+updateEmailSettings(
+  @Param('id') storeId: string,
+  @CurrentUser() user: any,
+  @Body() dto: any,
+) {
+  return this.storesService.updateEmailSettings(storeId, user.userId, dto);
+}
+
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Post(':id/test-email')
+testEmailSettings(
+  @Param('id') storeId: string,
+  @CurrentUser() user: any,
+) {
+  return this.storesService.testEmailSettings(storeId, user.userId);
 }
 }

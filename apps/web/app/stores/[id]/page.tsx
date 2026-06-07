@@ -10,8 +10,11 @@ import {
   ClipboardCheck,
   Download,
   ExternalLink,
+  Loader2,
+  Mail,
   PlugZap,
   RotateCw,
+  Send,
   ShieldCheck,
   Wifi,
   WifiOff,
@@ -122,6 +125,24 @@ export default function StoreDetailsPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
+  // Email settings
+  const [emailProvider, setEmailProvider] = useState('gmail');
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPass, setSmtpPass] = useState('');
+  const [smtpFrom, setSmtpFrom] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [emailMessage, setEmailMessage] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [emailVerified, setEmailVerified] = useState(false);
+
+  const PROVIDERS: Record<string, { host: string; port: number; secure: boolean; label: string; hint: string }> = {
+    gmail:   { host: 'smtp.gmail.com',        port: 587,  secure: false, label: 'Gmail',       hint: 'Use a Gmail App Password (not your real password). Enable 2FA first → Google Account → Security → App Passwords.' },
+    outlook: { host: 'smtp.office365.com',    port: 587,  secure: false, label: 'Outlook / Hotmail', hint: 'Use your Microsoft account email and password.' },
+    yahoo:   { host: 'smtp.mail.yahoo.com',   port: 587,  secure: false, label: 'Yahoo Mail',  hint: 'Use a Yahoo App Password (Account Security → Generate app password).' },
+    custom:  { host: '',                       port: 587,  secure: false, label: 'Custom SMTP', hint: 'Enter your own SMTP server details.' },
+  };
+
   const store = useMemo(() => stores.find((s) => s.id === storeId), [storeId, stores]);
 
   const webhookCartUrl = `${API_BASE_URL}/webhooks/cart-session/${storeId}`;
@@ -172,6 +193,44 @@ export default function StoreDetailsPage() {
     }
   };
 
+  const saveEmailSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingEmail(true);
+    setEmailError('');
+    setEmailMessage('');
+    try {
+      const p = PROVIDERS[emailProvider];
+      await api.patch(`/stores/${storeId}/email-settings`, {
+        smtpHost: emailProvider === 'custom' ? smtpUser : p.host,
+        smtpPort: p.port,
+        smtpSecure: p.secure,
+        smtpUser,
+        smtpPass,
+        smtpFrom: smtpFrom || smtpUser,
+      });
+      setEmailMessage('Email settings saved. Click "Send test email" to verify.');
+    } catch (err) {
+      setEmailError(getApiErrorMessage(err, 'Failed to save email settings'));
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const sendTestEmail = async () => {
+    setTestingEmail(true);
+    setEmailError('');
+    setEmailMessage('');
+    try {
+      await api.post(`/stores/${storeId}/test-email`, {});
+      setEmailVerified(true);
+      setEmailMessage('Test email sent! Check your inbox to confirm.');
+    } catch (err) {
+      setEmailError(getApiErrorMessage(err, 'Test failed — check your credentials'));
+    } finally {
+      setTestingEmail(false);
+    }
+  };
+
   return (
     <AppShell
       title={store?.name ?? 'Store setup'}
@@ -194,6 +253,7 @@ export default function StoreDetailsPage() {
         ) : !store ? (
           <Alert type="error">Store not found.</Alert>
         ) : (
+          <div className="space-y-6">
           <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
 
             {/* ── Left: setup wizard ── */}
@@ -353,6 +413,135 @@ export default function StoreDetailsPage() {
               </a>
             </div>
 
+          </div>
+
+          {/* ── Email settings ── */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50">
+                <Mail size={17} className="text-teal-600" />
+              </span>
+              <div>
+                <h2 className="font-semibold text-slate-900">Recovery email sender</h2>
+                <p className="text-xs text-slate-400">Connect your Gmail or other email to send abandoned cart follow-ups</p>
+              </div>
+              {emailVerified && (
+                <span className="ml-auto flex items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-600">
+                  <CheckCircle2 size={12} /> Verified
+                </span>
+              )}
+            </div>
+
+            {emailError && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <span>❌</span> {emailError}
+              </div>
+            )}
+            {emailMessage && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-3 text-sm text-teal-700">
+                <CheckCircle2 size={14} /> {emailMessage}
+              </div>
+            )}
+
+            {/* Provider selector */}
+            <div className="mb-5">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Email provider</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {Object.entries(PROVIDERS).map(([key, p]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setEmailProvider(key)}
+                    className={`rounded-xl border px-3 py-2.5 text-center text-sm font-medium transition ${
+                      emailProvider === key
+                        ? 'border-teal-500 bg-teal-50 text-teal-700'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-400">{PROVIDERS[emailProvider]?.hint}</p>
+            </div>
+
+            <form onSubmit={saveEmailSettings}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {emailProvider === 'gmail' ? 'Gmail address' : 'Email / Username'}
+                  </label>
+                  <input
+                    type="email"
+                    value={smtpUser}
+                    onChange={(e) => setSmtpUser(e.target.value)}
+                    placeholder="you@gmail.com"
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    {emailProvider === 'gmail' ? 'App Password (16 chars)' : 'Password'}
+                  </label>
+                  <input
+                    type="password"
+                    value={smtpPass}
+                    onChange={(e) => setSmtpPass(e.target.value)}
+                    placeholder={emailProvider === 'gmail' ? 'xxxx xxxx xxxx xxxx' : '••••••••'}
+                    required
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    From name / address (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={smtpFrom}
+                    onChange={(e) => setSmtpFrom(e.target.value)}
+                    placeholder={`${store.name} <you@gmail.com>`}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  />
+                </div>
+              </div>
+
+              {emailProvider === 'gmail' && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="mb-1.5 text-xs font-semibold text-amber-800">How to get a Gmail App Password:</p>
+                  <ol className="list-decimal space-y-0.5 pl-4 text-xs text-amber-700">
+                    <li>Go to <strong>myaccount.google.com</strong> → Security</li>
+                    <li>Enable <strong>2-Step Verification</strong> if not already on</li>
+                    <li>Search <strong>"App passwords"</strong> → select Mail → Generate</li>
+                    <li>Copy the 16-character password and paste it above</li>
+                  </ol>
+                </div>
+              )}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="submit"
+                  disabled={savingEmail}
+                  className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {savingEmail ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                  {savingEmail ? 'Saving…' : 'Save email settings'}
+                </button>
+                <button
+                  type="button"
+                  onClick={sendTestEmail}
+                  disabled={testingEmail}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {testingEmail ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  {testingEmail ? 'Sending…' : 'Send test email'}
+                </button>
+              </div>
+            </form>
+          </div>
           </div>
         )}
       </div>

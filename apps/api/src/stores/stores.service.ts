@@ -1,10 +1,7 @@
-import {
-Injectable,
-BadRequestException,
-} from '@nestjs/common';
-
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { randomBytes } from 'crypto';
+import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class StoresService {
@@ -61,6 +58,64 @@ where: {
 ownerId: userId,
 },
 });
+}
+
+async updateEmailSettings(storeId: string, userId: string, dto: any) {
+  const store = await this.prisma.store.findFirst({
+    where: { id: storeId, ownerId: userId },
+  });
+  if (!store) throw new BadRequestException('Store not found');
+
+  return this.prisma.store.update({
+    where: { id: storeId },
+    data: {
+      smtpHost: dto.smtpHost,
+      smtpPort: Number(dto.smtpPort) || 587,
+      smtpUser: dto.smtpUser,
+      smtpPass: dto.smtpPass,
+      smtpFrom: dto.smtpFrom || dto.smtpUser,
+      smtpSecure: dto.smtpSecure === true || dto.smtpSecure === 'true',
+      smtpVerified: false,
+    },
+    select: {
+      id: true, smtpHost: true, smtpPort: true,
+      smtpUser: true, smtpFrom: true, smtpSecure: true, smtpVerified: true,
+    },
+  });
+}
+
+async testEmailSettings(storeId: string, userId: string) {
+  const store = await this.prisma.store.findFirst({
+    where: { id: storeId, ownerId: userId },
+  });
+  if (!store) throw new BadRequestException('Store not found');
+  if (!store.smtpHost || !store.smtpUser || !store.smtpPass) {
+    throw new BadRequestException('Email settings not configured yet');
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: store.smtpHost,
+    port: store.smtpPort,
+    secure: store.smtpSecure,
+    auth: { user: store.smtpUser, pass: store.smtpPass },
+    tls: { rejectUnauthorized: false },
+  });
+
+  await transporter.verify();
+
+  const info = await transporter.sendMail({
+    from: `"Abandonment Buddy" <${store.smtpFrom || store.smtpUser}>`,
+    to: store.smtpUser,
+    subject: '✅ Abandonment Buddy — Email connection verified',
+    html: `<p>Your email is connected to <strong>${store.name}</strong> and ready to send cart recovery emails.</p>`,
+  });
+
+  await this.prisma.store.update({
+    where: { id: storeId },
+    data: { smtpVerified: true },
+  });
+
+  return { success: true, messageId: info.messageId };
 }
 
 async connectStore(

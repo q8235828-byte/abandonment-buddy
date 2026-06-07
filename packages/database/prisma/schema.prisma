@@ -42,6 +42,14 @@ model Store {
   status                StoreStatus @default(DISCONNECTED)
   abandonmentTimeoutMin Int         @default(180)
 
+  smtpHost     String?
+  smtpPort     Int     @default(587)
+  smtpUser     String?
+  smtpPass     String?
+  smtpFrom     String?
+  smtpSecure   Boolean @default(false)
+  smtpVerified Boolean @default(false)
+
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
 

@@ -10,19 +10,18 @@ const redisConnection = new IORedis(
   { maxRetriesPerRequest: null, enableReadyCheck: false },
 );
 
-function buildTransporter() {
-  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const port = Number(process.env.SMTP_PORT) || 587;
-  const secure = process.env.SMTP_SECURE === 'true';
+function buildTransporter(store: any) {
+  const host = store.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = store.smtpPort || Number(process.env.SMTP_PORT) || 587;
+  const secure = store.smtpSecure ?? (process.env.SMTP_SECURE === 'true');
+  const user = store.smtpUser || process.env.SMTP_USER || '';
+  const pass = store.smtpPass || process.env.SMTP_PASS || '';
 
   return nodemailer.createTransport({
     host,
     port,
     secure,
-    auth: {
-      user: process.env.SMTP_USER || '',
-      pass: process.env.SMTP_PASS || '',
-    },
+    auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });
 }
@@ -167,6 +166,9 @@ const worker = new Worker(
       console.log(`📧 Email already sent for order ${orderId}, skipping`);
       return;
     }
+    if (!order.store.smtpUser && !process.env.SMTP_USER) {
+      throw new Error(`Store ${order.store.id} has no email configured`);
+    }
 
     const cartItems = Array.isArray(order.cartSnapshot) ? order.cartSnapshot : [];
 
@@ -177,10 +179,11 @@ const worker = new Worker(
       storeUrl: order.store.domain ? `https://${order.store.domain}` : undefined,
     });
 
-    const transporter = buildTransporter();
+    const transporter = buildTransporter(order.store);
 
+    const fromAddr = order.store.smtpFrom || order.store.smtpUser || process.env.SMTP_FROM || process.env.SMTP_USER;
     const info = await transporter.sendMail({
-      from: `"${order.store.name || 'Your Store'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"${order.store.name || 'Your Store'}" <${fromAddr}>`,
       to: order.customerEmail,
       subject: `${order.customerName ? order.customerName.split(' ')[0] + ', you' : 'You'} left $${order.cartValue?.toFixed(2) ?? '0.00'} in your cart 🛒`,
       html,
