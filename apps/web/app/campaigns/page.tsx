@@ -165,9 +165,10 @@ function RecoveryTimeline({ emailEnabled, emailDelay, whatsappEnabled, whatsappD
 }
 
 // ── Template editor ───────────────────────────────────────────────────────────
-function TemplateEditor({ title, channel = 'email', value, preview, onChange, compact = false }: {
+function TemplateEditor({ title, channel = 'email', value, preview, onChange, onReset, compact = false }: {
   title: string; channel?: 'email' | 'whatsapp' | 'sms';
-  value: string; preview: string; onChange: (v: string) => void; compact?: boolean;
+  value: string; preview: string; onChange: (v: string) => void;
+  onReset?: () => void; compact?: boolean;
 }) {
   const isHtml = channel === 'email' && value.trim().startsWith('<');
 
@@ -183,8 +184,16 @@ function TemplateEditor({ title, channel = 'email', value, preview, onChange, co
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-        {isHtml && <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-600">HTML email</span>}
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+          {isHtml && <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-600">HTML email</span>}
+        </div>
+        {onReset && (
+          <button type="button" onClick={onReset}
+            className="text-xs text-slate-400 hover:text-teal-600 underline underline-offset-2 transition">
+            Reset to default template
+          </button>
+        )}
       </div>
       <div className="grid gap-5 lg:grid-cols-2">
         <textarea value={value}
@@ -444,7 +453,7 @@ export default function CampaignsPage() {
               {campaignLoading && <LoadingRow label="Loading saved templates…" />}
 
               {emailEnabled && (
-                <TemplateEditor title="Email template" channel="email" value={emailTemplate} preview={emailPreview} onChange={setEmailTemplate} />
+                <TemplateEditor title="Email template" channel="email" value={emailTemplate} preview={emailPreview} onChange={setEmailTemplate} onReset={() => setEmailTemplate(DEFAULT_EMAIL_TEMPLATE)} />
               )}
               {whatsappEnabled && (
                 <TemplateEditor title="WhatsApp template" channel="whatsapp" value={whatsappTemplate} preview={whatsappPreview} onChange={setWhatsappTemplate} />
