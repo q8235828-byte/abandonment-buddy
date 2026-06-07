@@ -6,6 +6,8 @@ Patch,
 Body,
 Param,
 UseGuards,
+UsePipes,
+ValidationPipe,
 } from '@nestjs/common';
 
 import {
@@ -74,11 +76,12 @@ user.userId,
 
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
+@UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
 @Patch(':id/email-settings')
 updateEmailSettings(
   @Param('id') storeId: string,
   @CurrentUser() user: any,
-  @Body() dto: any,
+  @Body() dto: Record<string, any>,
 ) {
   return this.storesService.updateEmailSettings(storeId, user.userId, dto);
 }

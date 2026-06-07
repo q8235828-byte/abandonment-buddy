@@ -5,6 +5,8 @@ import {
   Patch,
   Post,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -75,8 +77,9 @@ export class AuthController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   @Patch('settings')
-  updateSettings(@CurrentUser() user: any, @Body() dto: any) {
+  updateSettings(@CurrentUser() user: any, @Body() dto: Record<string, any>) {
     return this.authService.updateSettings(user.userId, dto);
   }
 }
