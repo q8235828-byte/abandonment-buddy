@@ -24,31 +24,12 @@ import {
 import type { User } from '../lib/types';
 
 const navItems = [
-  {
-    href: '/dashboard',
-    label: 'Dashboard',
-    icon: BarChart3,
-  },
-  {
-    href: '/stores',
-    label: 'Stores',
-    icon: StoreIcon,
-  },
-  {
-    href: '/abandoned-orders',
-    label: 'Orders',
-    icon: PackageSearch,
-  },
-  {
-    href: '/campaigns',
-    label: 'Campaigns',
-    icon: Mail,
-  },
-  {
-    href: '/templates',
-    label: 'Templates',
-    icon: FileText,
-  },
+  { href: '/dashboard',       label: 'Dashboard', icon: BarChart3 },
+  { href: '/stores',          label: 'Stores',    icon: StoreIcon },
+  { href: '/abandoned-orders',label: 'Orders',    icon: PackageSearch },
+  { href: '/campaigns',       label: 'Campaigns', icon: Mail },
+  { href: '/templates',       label: 'Templates', icon: FileText },
+  { href: '/settings',        label: 'Settings',  icon: Settings },
 ];
 
 type AppShellProps = {

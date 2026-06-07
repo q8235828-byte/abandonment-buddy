@@ -65,4 +65,18 @@ export class AuthController {
   changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(user.userId, dto);
   }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get('settings')
+  getSettings(@CurrentUser() user: any) {
+    return this.authService.getSettings(user.userId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Patch('settings')
+  updateSettings(@CurrentUser() user: any, @Body() dto: any) {
+    return this.authService.updateSettings(user.userId, dto);
+  }
 }

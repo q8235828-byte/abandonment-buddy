@@ -29,6 +29,20 @@ model User {
   resetToken        String?
   resetTokenExpires DateTime?
 
+  // Account-level communication credentials
+  smtpHost     String?
+  smtpPort     Int     @default(587)
+  smtpUser     String?
+  smtpPass     String?
+  smtpFrom     String?
+  smtpSecure   Boolean @default(false)
+  smtpVerified Boolean @default(false)
+
+  twilioAccountSid  String?
+  twilioAuthToken   String?
+  twilioFromPhone   String?
+  twilioWhatsappNum String?
+
   stores Store[]
 }
 

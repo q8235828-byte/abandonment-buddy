@@ -206,15 +206,48 @@ export class AuthService {
       });
 
     return {
-      message:
-        'Login successful',
+      message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName:
-          user.fullName,
-      },
+      user: { id: user.id, email: user.email, fullName: user.fullName },
     };
+  }
+
+  async getSettings(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+    return {
+      smtpHost:     user.smtpHost,
+      smtpPort:     user.smtpPort,
+      smtpUser:     user.smtpUser,
+      smtpFrom:     user.smtpFrom,
+      smtpSecure:   user.smtpSecure,
+      smtpVerified: user.smtpVerified,
+      twilioAccountSid:  user.twilioAccountSid,
+      twilioFromPhone:   user.twilioFromPhone,
+      twilioWhatsappNum: user.twilioWhatsappNum,
+      // never return twilioAuthToken or smtpPass
+    };
+  }
+
+  async updateSettings(userId: string, dto: any) {
+    const data: any = {};
+
+    // Email
+    if (dto.smtpHost    !== undefined) data.smtpHost    = dto.smtpHost;
+    if (dto.smtpPort    !== undefined) data.smtpPort    = Number(dto.smtpPort) || 587;
+    if (dto.smtpUser    !== undefined) data.smtpUser    = dto.smtpUser;
+    if (dto.smtpFrom    !== undefined) data.smtpFrom    = dto.smtpFrom;
+    if (dto.smtpSecure  !== undefined) data.smtpSecure  = Boolean(dto.smtpSecure);
+    if (dto.smtpPass)                  data.smtpPass    = dto.smtpPass;
+    if ('smtpHost' in dto)             data.smtpVerified = false;
+
+    // Twilio SMS / WhatsApp
+    if (dto.twilioAccountSid  !== undefined) data.twilioAccountSid  = dto.twilioAccountSid;
+    if (dto.twilioAuthToken)                 data.twilioAuthToken   = dto.twilioAuthToken;
+    if (dto.twilioFromPhone   !== undefined) data.twilioFromPhone   = dto.twilioFromPhone;
+    if (dto.twilioWhatsappNum !== undefined) data.twilioWhatsappNum = dto.twilioWhatsappNum;
+
+    await this.prisma.user.update({ where: { id: userId }, data });
+    return { success: true };
   }
 }
