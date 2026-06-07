@@ -7,6 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
   Bell,
+  CreditCard,
   LogOut,
   Mail,
   FileText,
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/abandoned-orders',label: 'Orders',    icon: PackageSearch },
   { href: '/campaigns',       label: 'Campaigns', icon: Mail },
   { href: '/templates',       label: 'Templates', icon: FileText },
+  { href: '/billing',         label: 'Billing',   icon: CreditCard },
   { href: '/settings',        label: 'Settings',  icon: Settings },
 ];
 

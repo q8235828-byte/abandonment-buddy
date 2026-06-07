@@ -18,6 +18,19 @@ enum AbandonedStatus {
   EXPIRED
 }
 
+enum PlanType {
+  FREE
+  STARTER
+  PRO
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  EXPIRED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -43,7 +56,32 @@ model User {
   twilioFromPhone   String?
   twilioWhatsappNum String?
 
-  stores Store[]
+  // Plan & usage
+  plan          PlanType @default(FREE)
+  planExpiresAt DateTime?
+
+  ordersUsed     Int      @default(0)
+  emailsUsed     Int      @default(0)
+  smsUsed        Int      @default(0)
+  whatsappUsed   Int      @default(0)
+  usageResetAt   DateTime @default(now())
+
+  stores   Store[]
+  payments Payment[]
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  plan           PlanType
+  amountUsd      Float
+  nowPaymentId   String?       @unique
+  invoiceId      String?       @unique
+  paymentUrl     String?
+  status         PaymentStatus @default(PENDING)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Store {
