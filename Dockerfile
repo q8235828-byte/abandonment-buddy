@@ -38,4 +38,4 @@ RUN pnpm --filter @abandonment-buddy/database db:generate || true
 
 EXPOSE 3001
 
-CMD ["node", "apps/api/dist/main"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema packages/database/prisma/schema.prisma && node apps/api/dist/main"]
