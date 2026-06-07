@@ -6,7 +6,11 @@
       "Bash(git init *)",
       "Bash(git add *)",
       "Bash(cd \"c:/Users/WC/Projects/abandonment-buddy\" && rm -rf apps/api/.git && echo \"removed\")",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(64\\).toString\\('hex'\\)\\)\")",
+      "Bash(git pull *)",
+      "Bash(git stash *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\WC\\Projects\\abandonment-buddy\\apps\\api\\.git"
