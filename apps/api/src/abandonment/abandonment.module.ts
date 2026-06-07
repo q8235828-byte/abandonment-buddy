@@ -7,12 +7,14 @@ import { AbandonmentService } from './services/abandonment.service';
 
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queues/queue.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     PrismaModule,
     QueueModule,
+    AuthModule,
   ],
 
   controllers: [
