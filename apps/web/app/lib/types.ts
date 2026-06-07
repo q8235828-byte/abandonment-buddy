@@ -23,18 +23,30 @@ export type Store = {
   updatedAt: string;
 };
 
+export type CartItem = {
+  id: number;
+  name: string;
+  quantity: number;
+  price: number;
+  total: number;
+  image?: string;
+};
+
 export type AbandonedOrder = {
   id: string;
   externalOrderId: string;
+  sessionId?: string | null;
   customerEmail?: string | null;
   customerPhone?: string | null;
   customerName?: string | null;
   cartValue?: number | null;
+  cartSnapshot?: CartItem[] | null;
   orderStatus?: string | null;
   isAbandoned: boolean;
   status: 'DETECTED' | 'RECOVERED' | 'EXPIRED';
   abandonedAt?: string | null;
   recoveredAt?: string | null;
+  emailSentAt?: string | null;
   createdAt: string;
   updatedAt: string;
   store?: Store;
