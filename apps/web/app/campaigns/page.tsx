@@ -169,6 +169,8 @@ function TemplateEditor({ title, channel = 'email', value, preview, onChange, co
   title: string; channel?: 'email' | 'whatsapp' | 'sms';
   value: string; preview: string; onChange: (v: string) => void; compact?: boolean;
 }) {
+  const isHtml = channel === 'email' && value.trim().startsWith('<');
+
   const insertToken = (token: string, target: HTMLTextAreaElement | null) => {
     if (!target) { onChange(`${value} ${token}`); return; }
     const start = target.selectionStart, end = target.selectionEnd;
@@ -176,21 +178,28 @@ function TemplateEditor({ title, channel = 'email', value, preview, onChange, co
     requestAnimationFrame(() => { target.focus(); const p = start + token.length; target.setSelectionRange(p, p); });
   };
 
+  const editorH = isHtml ? 'h-[500px]' : compact ? 'h-36' : 'h-64';
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="mb-3 text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm font-semibold text-slate-900">{title}</p>
+        {isHtml && <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-600">HTML email</span>}
+      </div>
       <div className="grid gap-5 lg:grid-cols-2">
-        <label className="block">
-          <textarea rows={compact ? 5 : 10} value={value}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); insertToken(e.dataTransfer.getData('text/plain'), e.currentTarget); }}
-            onChange={(e) => onChange(e.target.value)}
-            className={`${compact ? 'h-36' : 'h-64'} w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 font-mono text-sm leading-6 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition`} />
-        </label>
+        <textarea value={value}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => { e.preventDefault(); insertToken(e.dataTransfer.getData('text/plain'), e.currentTarget); }}
+          onChange={(e) => onChange(e.target.value)}
+          className={`${editorH} w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-5 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition`} />
         <div>
-          <p className="mb-2 text-sm font-semibold text-slate-900">Preview</p>
-          {channel === 'whatsapp' ? (
-            <div className={`${compact ? 'h-36' : 'h-64'} overflow-hidden rounded-xl border border-emerald-200 bg-[#efeae2]`}>
+          <p className="mb-2 text-sm font-semibold text-slate-900">Live preview</p>
+          {isHtml ? (
+            <iframe srcDoc={preview} title="Email preview"
+              className={`${editorH} w-full rounded-xl border border-slate-200 bg-white`}
+              sandbox="allow-same-origin" />
+          ) : channel === 'whatsapp' ? (
+            <div className={`${editorH} overflow-hidden rounded-xl border border-emerald-200 bg-[#efeae2]`}>
               <div className="flex items-center gap-2 bg-[#075e54] px-3 py-2 text-white">
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/20 text-xs font-semibold">AB</div>
                 <div><p className="text-xs font-semibold">Abandonment Buddy</p><p className="text-[10px] text-white/75">online</p></div>
@@ -203,7 +212,7 @@ function TemplateEditor({ title, channel = 'email', value, preview, onChange, co
               </div>
             </div>
           ) : channel === 'sms' ? (
-            <div className={`${compact ? 'h-36' : 'h-64'} flex items-end rounded-xl bg-slate-950 p-4`}>
+            <div className={`${editorH} flex items-end rounded-xl bg-slate-950 p-4`}>
               <div className="w-full max-w-[80%] rounded-2xl rounded-bl-sm bg-slate-700 px-4 py-3 text-sm leading-6 text-white">
                 {preview}
               </div>
