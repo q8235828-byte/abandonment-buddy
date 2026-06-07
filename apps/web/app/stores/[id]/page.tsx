@@ -291,15 +291,24 @@ export default function StoreDetailsPage() {
                     Download the WooCommerce plugin, then install it via{' '}
                     <strong>WordPress Admin → Plugins → Add New → Upload Plugin</strong>.
                   </p>
-                  <a
-                    href="/api/plugin"
-                    download="abandonment-buddy.php"
-                    className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
-                  >
-                    <Download size={15} /> Download abandonment-buddy.php
-                  </a>
+                  <div className="flex flex-wrap gap-3">
+                    <a
+                      href="/api/download-plugin"
+                      download="abandonment-buddy.zip"
+                      className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
+                    >
+                      <Download size={15} /> Download .zip (recommended)
+                    </a>
+                    <a
+                      href="/api/plugin"
+                      download="abandonment-buddy.php"
+                      className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      <Download size={15} /> Download .php only
+                    </a>
+                  </div>
                   <p className="mt-2 text-xs text-slate-400">
-                    Alternatively, upload the .php file via FTP to <code className="rounded bg-slate-100 px-1">wp-content/plugins/</code>
+                    Install the <strong>.zip</strong> via WordPress Admin → Plugins → Add New → Upload Plugin, or upload the <strong>.php</strong> file via FTP to <code className="rounded bg-slate-100 px-1">wp-content/plugins/abandonment-buddy/</code>
                   </p>
                 </Step>
 
