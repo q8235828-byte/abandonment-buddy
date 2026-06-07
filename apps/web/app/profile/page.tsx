@@ -7,9 +7,11 @@ import {
   CheckCircle2,
   KeyRound,
   Loader2,
+  Lock,
   Mail,
   Save,
   ShieldCheck,
+  Sparkles,
   User,
 } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
@@ -22,57 +24,32 @@ type ProfileData = {
   createdAt: string;
 };
 
-function Section({
-  title,
-  description,
-  icon,
-  children,
-}: {
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-      <div>
-        <div className="mb-2 flex items-center gap-2">
-          <span className="text-slate-400">{icon}</span>
-          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-        </div>
-        <p className="text-sm leading-6 text-slate-500">{description}</p>
-      </div>
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function StatusBanner({
-  type,
-  message,
-}: {
-  type: 'success' | 'error';
-  message: string;
-}) {
+function StatusBanner({ type, message }: { type: 'success' | 'error'; message: string }) {
   return (
     <div
-      className={`mb-5 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm ${
+      className={`mb-5 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium ${
         type === 'success'
           ? 'border-teal-200 bg-teal-50 text-teal-700'
           : 'border-rose-200 bg-rose-50 text-rose-700'
       }`}
     >
-      {type === 'success' ? (
-        <CheckCircle2 size={16} className="shrink-0" />
-      ) : (
-        <AlertTriangle size={16} className="shrink-0" />
-      )}
+      {type === 'success' ? <CheckCircle2 size={15} className="shrink-0" /> : <AlertTriangle size={15} className="shrink-0" />}
       {message}
     </div>
   );
 }
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputCls =
+  'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -80,12 +57,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // Personal info form
   const [fullName, setFullName] = useState('');
   const [savingInfo, setSavingInfo] = useState(false);
   const [infoStatus, setInfoStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Password form
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -110,7 +85,6 @@ export default function ProfilePage() {
     try {
       const res = await api.patch<{ user: ProfileData }>('/auth/profile', { fullName });
       setProfile((p) => (p ? { ...p, fullName: res.data.user.fullName } : p));
-      // Sync localStorage
       const stored = localStorage.getItem('user');
       if (stored) {
         const parsed = JSON.parse(stored);
@@ -152,217 +126,241 @@ export default function ProfilePage() {
     .slice(0, 2)
     .toUpperCase();
 
+  const memberSince = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : '—';
+
   return (
-    <AppShell
-      title="My Profile"
-      subtitle="Manage your account information and password"
-    >
+    <AppShell title="My Profile" subtitle="Manage your account information and security">
       {loadingProfile ? (
-        <div className="flex items-center justify-center py-24">
-          <Loader2 size={28} className="animate-spin text-slate-400" />
+        <div className="flex items-center justify-center py-32">
+          <Loader2 size={28} className="animate-spin text-slate-300" />
         </div>
       ) : (
-        <div className="mx-auto max-w-3xl space-y-10">
+        <div className="mx-auto max-w-2xl space-y-6">
 
-          {/* ── Avatar header ── */}
-          <div className="flex items-center gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-xl font-bold text-white">
-              {initials}
+          {/* ── Hero card ── */}
+          <div className="relative overflow-hidden rounded-2xl bg-slate-950 px-6 py-8 text-white shadow-xl">
+            {/* decorative gradient blobs */}
+            <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-teal-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-12 -left-10 h-44 w-44 rounded-full bg-violet-500/20 blur-3xl" />
+
+            <div className="relative flex items-center gap-5">
+              {/* Avatar */}
+              <div className="relative shrink-0">
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-teal-600 text-2xl font-bold shadow-lg">
+                  {initials}
+                </div>
+                <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400 shadow">
+                  <CheckCircle2 size={11} className="text-white" />
+                </div>
+              </div>
+
+              {/* Name + email */}
+              <div className="flex-1 min-w-0">
+                <p className="truncate text-xl font-bold">
+                  {profile?.fullName || 'No name set'}
+                </p>
+                <p className="mt-0.5 truncate text-sm text-slate-400">{profile?.email}</p>
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-slate-300">
+                  <Sparkles size={11} className="text-teal-400" />
+                  Starter Plan &nbsp;·&nbsp; Member since {memberSince}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-lg font-semibold text-slate-900">
-                {profile?.fullName || 'No name set'}
-              </p>
-              <p className="text-sm text-slate-500">{profile?.email}</p>
-              <p className="mt-1 text-xs text-slate-400">
-                Member since{' '}
-                {profile?.createdAt
-                  ? new Date(profile.createdAt).toLocaleDateString('en-US', {
-                      month: 'long',
-                      year: 'numeric',
-                    })
-                  : '—'}
-              </p>
+
+            {/* Stats row */}
+            <div className="relative mt-6 grid grid-cols-3 gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10">
+              {[
+                { label: 'Plan', value: 'Free' },
+                { label: 'Status', value: 'Active' },
+                { label: 'Since', value: memberSince.split(' ')[1] ?? '—' },
+              ].map((s) => (
+                <div key={s.label} className="bg-slate-950/60 px-4 py-3 text-center">
+                  <p className="text-base font-bold text-white">{s.value}</p>
+                  <p className="text-xs text-slate-500">{s.label}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           {/* ── Personal information ── */}
-          <Section
-            title="Personal information"
-            description="Update your display name. Your email address cannot be changed."
-            icon={<User size={16} />}
-          >
-            {infoStatus && (
-              <StatusBanner type={infoStatus.type} message={infoStatus.message} />
-            )}
-            <form onSubmit={handleSaveInfo} className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+                <User size={15} className="text-slate-600" />
+              </span>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Full name
-                </label>
+                <h2 className="text-sm font-semibold text-slate-900">Personal information</h2>
+                <p className="text-xs text-slate-400">Update your display name</p>
+              </div>
+            </div>
+
+            {infoStatus && <StatusBanner type={infoStatus.type} message={infoStatus.message} />}
+
+            <form onSubmit={handleSaveInfo} className="space-y-4">
+              <Field label="Full name">
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  className={inputCls}
                   placeholder="John Doe"
                 />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Email address
-                </label>
-                <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
-                  <Mail size={15} className="shrink-0 text-slate-400" />
-                  <span className="text-sm text-slate-500">{profile?.email}</span>
-                  <span className="ml-auto rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-500">
+              </Field>
+
+              <Field label="Email address">
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5">
+                  <Mail size={14} className="shrink-0 text-slate-400" />
+                  <span className="flex-1 truncate text-sm text-slate-500">{profile?.email}</span>
+                  <span className="flex items-center gap-1 rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-500">
+                    <Lock size={9} />
                     Read-only
                   </span>
                 </div>
-              </div>
+              </Field>
+
               <div className="flex justify-end pt-1">
                 <button
                   type="submit"
                   disabled={savingInfo}
-                  className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {savingInfo ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Save size={14} />
-                  )}
+                  {savingInfo ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {savingInfo ? 'Saving…' : 'Save changes'}
                 </button>
               </div>
             </form>
-          </Section>
+          </div>
 
           {/* ── Change password ── */}
-          <Section
-            title="Change password"
-            description="Use a strong password of at least 6 characters. You will stay signed in after changing."
-            icon={<KeyRound size={16} />}
-          >
-            {passwordStatus && (
-              <StatusBanner type={passwordStatus.type} message={passwordStatus.message} />
-            )}
-            <form onSubmit={handleChangePassword} className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+                <KeyRound size={15} className="text-slate-600" />
+              </span>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                  Current password
-                </label>
+                <h2 className="text-sm font-semibold text-slate-900">Change password</h2>
+                <p className="text-xs text-slate-400">Use at least 6 characters</p>
+              </div>
+            </div>
+
+            {passwordStatus && <StatusBanner type={passwordStatus.type} message={passwordStatus.message} />}
+
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <Field label="Current password">
                 <input
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                  className={inputCls}
                   placeholder="Enter current password"
                   required
                 />
-              </div>
+              </Field>
+
               <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    New password
-                  </label>
+                <Field label="New password">
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className={inputCls}
                     placeholder="At least 6 characters"
                     minLength={6}
                     required
                   />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    Confirm new password
-                  </label>
+                </Field>
+                <Field label="Confirm new password">
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-500/20"
+                    className={inputCls}
                     placeholder="Repeat new password"
                     required
                   />
-                </div>
+                </Field>
               </div>
+
               <div className="flex justify-end pt-1">
                 <button
                   type="submit"
                   disabled={savingPassword}
-                  className="flex items-center gap-2 rounded-lg bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                  className="flex items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
                 >
-                  {savingPassword ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <KeyRound size={14} />
-                  )}
+                  {savingPassword ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
                   {savingPassword ? 'Updating…' : 'Update password'}
                 </button>
               </div>
             </form>
-          </Section>
+          </div>
 
           {/* ── Account details ── */}
-          <Section
-            title="Account details"
-            description="Information about your account and current plan."
-            icon={<ShieldCheck size={16} />}
-          >
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100">
+                <ShieldCheck size={15} className="text-slate-600" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">Account details</h2>
+                <p className="text-xs text-slate-400">Your account information and plan</p>
+              </div>
+            </div>
+
             <dl className="divide-y divide-slate-100">
               {[
-                { label: 'Account ID', value: profile?.id ?? '—' },
-                {
-                  label: 'Email address',
-                  value: profile?.email ?? '—',
-                },
+                { label: 'Account ID', value: profile?.id ?? '—', mono: true },
+                { label: 'Email address', value: profile?.email ?? '—', mono: false },
                 {
                   label: 'Member since',
                   value: profile?.createdAt
                     ? new Date(profile.createdAt).toLocaleDateString('en-US', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
+                        day: 'numeric', month: 'long', year: 'numeric',
                       })
                     : '—',
+                  mono: false,
                 },
-                { label: 'Current plan', value: 'Starter (Free)' },
+                { label: 'Current plan', value: 'Starter (Free)', mono: false },
               ].map((row) => (
-                <div key={row.label} className="flex items-start justify-between gap-4 py-3.5">
+                <div key={row.label} className="flex items-center justify-between gap-4 py-3">
                   <dt className="text-sm text-slate-500">{row.label}</dt>
-                  <dd className="text-right text-sm font-medium text-slate-900 break-all">
+                  <dd
+                    className={`text-right text-sm font-medium text-slate-900 break-all ${
+                      row.mono ? 'font-mono text-xs text-slate-500' : ''
+                    }`}
+                  >
                     {row.value}
                   </dd>
                 </div>
               ))}
             </dl>
-          </Section>
+          </div>
 
           {/* ── Danger zone ── */}
-          <Section
-            title="Danger zone"
-            description="Permanent actions that cannot be undone. Proceed with care."
-            icon={<AlertTriangle size={16} />}
-          >
-            <div className="flex items-start justify-between gap-6">
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/40 p-6">
+            <div className="mb-4 flex items-center gap-2.5">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100">
+                <AlertTriangle size={15} className="text-rose-500" />
+              </span>
               <div>
-                <p className="text-sm font-medium text-slate-900">Delete account</p>
-                <p className="mt-1 text-sm text-slate-500">
-                  Permanently delete your account and all associated stores, campaigns, and data.
-                </p>
+                <h2 className="text-sm font-semibold text-slate-900">Danger zone</h2>
+                <p className="text-xs text-rose-400">Permanent actions — cannot be undone</p>
               </div>
+            </div>
+            <div className="flex items-center justify-between gap-6">
+              <p className="text-sm text-slate-500">
+                Permanently delete your account, stores, campaigns, and all associated data.
+              </p>
               <button
                 disabled
-                className="shrink-0 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-600 opacity-50 cursor-not-allowed"
                 title="Contact support to delete your account"
+                className="shrink-0 rounded-xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-500 opacity-50 cursor-not-allowed shadow-sm"
               >
                 Delete account
               </button>
             </div>
-          </Section>
+          </div>
 
         </div>
       )}
