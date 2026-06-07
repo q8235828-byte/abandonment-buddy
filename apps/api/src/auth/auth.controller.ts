@@ -5,11 +5,13 @@ import {
   Patch,
   Post,
   Req,
+  Res,
   UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
+import { AuthGuard } from '@nestjs/passport';
 
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
@@ -69,6 +71,23 @@ export class AuthController {
   @Patch('change-password')
   changePassword(@CurrentUser() user: any, @Body() dto: ChangePasswordDto) {
     return this.authService.changePassword(user.userId, dto);
+  }
+
+  // ── Google OAuth ───────────────────────────────────────────────────────────
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  googleLogin() { /* Redirects to Google */ }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
+    const { token, user } = await this.authService.loginWithGoogle(req.user as any);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const params = new URLSearchParams({
+      token,
+      user: JSON.stringify(user),
+    });
+    res.redirect(`${frontendUrl}/auth/callback?${params.toString()}`);
   }
 
   @ApiBearerAuth()

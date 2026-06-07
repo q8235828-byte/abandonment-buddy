@@ -204,6 +204,27 @@ export class AuthService {
     };
   }
 
+  async loginWithGoogle(googleUser: { email: string; fullName: string; googleId: string }) {
+    let user = await this.prisma.user.findUnique({ where: { email: googleUser.email } });
+
+    if (!user) {
+      // Create account automatically — no password needed for OAuth users
+      user = await this.prisma.user.create({
+        data: {
+          email:    googleUser.email,
+          fullName: googleUser.fullName,
+          password: '', // OAuth users have no password
+        },
+      });
+    }
+
+    const token = await this.jwtService.signAsync({ sub: user.id, email: user.email });
+    return {
+      token,
+      user: { id: user.id, email: user.email, fullName: user.fullName, isAdmin: user.isAdmin },
+    };
+  }
+
   async getSettings(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new UnauthorizedException();
