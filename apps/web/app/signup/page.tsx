@@ -1,0 +1,218 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  ArrowRight,
+  CheckCircle2,
+  LockKeyhole,
+  Mail,
+  ShoppingCart,
+  User,
+} from 'lucide-react';
+import { api, getApiErrorMessage } from '../lib/api';
+
+type SignupResponse = {
+  token: string;
+  user: {
+    id: string;
+    email: string;
+    fullName?: string | null;
+  };
+};
+
+export default function SignupPage() {
+  const router = useRouter();
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+
+      const response = await api.post<SignupResponse>('/auth/signup', {
+        fullName,
+        email,
+        password,
+      });
+
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Signup failed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-[#f5f7fb] text-slate-950">
+      <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="relative hidden overflow-hidden bg-slate-950 text-white lg:block">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_15%,rgba(20,184,166,0.22),transparent_28%),radial-gradient(circle_at_78%_68%,rgba(245,158,11,0.16),transparent_28%)]" />
+          <div className="relative flex h-full flex-col justify-between p-12 xl:p-16">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-sm text-slate-200">
+                <ShoppingCart size={15} />
+                WooCommerce recovery console
+              </div>
+              <h1 className="mt-8 max-w-xl text-5xl font-semibold leading-tight tracking-normal">
+                Start recovering abandoned carts today.
+              </h1>
+              <p className="mt-5 max-w-lg text-base leading-7 text-slate-300">
+                Connect your WooCommerce store, configure your recovery campaigns, and watch revenue come back.
+              </p>
+            </div>
+
+            <div className="grid gap-4">
+              {[
+                'Free to get started — no credit card needed',
+                'Connect unlimited WooCommerce stores',
+                'Email, WhatsApp, and SMS recovery channels',
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.08] px-4 py-3"
+                >
+                  <CheckCircle2 size={18} className="text-teal-300" />
+                  <span className="text-sm text-slate-200">{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="flex items-center justify-center px-4 py-10 sm:px-8">
+          <div className="w-full max-w-md">
+            <div className="mb-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-950 text-white lg:hidden">
+                <ShoppingCart size={22} />
+              </div>
+              <p className="mt-6 text-sm font-medium uppercase text-slate-500">
+                Abandonment Buddy
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-normal">
+                Create your account
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Get started in seconds. No credit card required.
+              </p>
+            </div>
+
+            <form
+              onSubmit={handleSignup}
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+            >
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                    Full name
+                  </span>
+                  <div className="relative">
+                    <User size={17} className="absolute left-3 top-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm"
+                      placeholder="John Doe"
+                      required
+                    />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                    Email address
+                  </span>
+                  <div className="relative">
+                    <Mail size={17} className="absolute left-3 top-3.5 text-slate-400" />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm"
+                      placeholder="john@example.com"
+                      required
+                    />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                    Password
+                  </span>
+                  <div className="relative">
+                    <LockKeyhole size={17} className="absolute left-3 top-3.5 text-slate-400" />
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm"
+                      placeholder="At least 6 characters"
+                      minLength={6}
+                      required
+                    />
+                  </div>
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                    Confirm password
+                  </span>
+                  <div className="relative">
+                    <LockKeyhole size={17} className="absolute left-3 top-3.5 text-slate-400" />
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 text-sm"
+                      placeholder="Repeat your password"
+                      required
+                    />
+                  </div>
+                </label>
+              </div>
+
+              {error && (
+                <div className="mt-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+              >
+                {loading ? 'Creating account...' : 'Create account'}
+                <ArrowRight size={16} />
+              </button>
+
+              <p className="mt-5 text-center text-sm text-slate-500">
+                Already have an account?{' '}
+                <a href="/login" className="font-medium text-slate-800 hover:underline">
+                  Sign in
+                </a>
+              </p>
+            </form>
+          </div>
+        </section>
+      </div>
+    </main>
+  );
+}

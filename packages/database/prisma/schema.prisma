@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum StoreStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+enum AbandonedStatus {
+  DETECTED
+  RECOVERED
+  EXPIRED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  fullName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  resetToken        String?
+  resetTokenExpires DateTime?
+
+  stores Store[]
+}
+
+model Store {
+  id                    String      @id @default(cuid())
+  name                  String
+  domain                String      @unique
+  apiKey                String      @unique
+  apiSecret             String
+  webhookSecret         String
+  status                StoreStatus @default(DISCONNECTED)
+  abandonmentTimeoutMin Int         @default(60)
+
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id])
+
+  abandonedOrders AbandonedOrder[]
+  campaigns       Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AbandonedOrder {
+  id String @id @default(cuid())
+
+  externalOrderId String
+  sessionId       String?
+
+  customerEmail String?
+  customerPhone String?
+  customerName  String?
+
+  cartValue    Float?
+  cartSnapshot Json?
+
+  orderStatus String?
+  isAbandoned Boolean @default(false)
+
+  status AbandonedStatus @default(DETECTED)
+
+  abandonedAt DateTime?
+  recoveredAt DateTime?
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Campaign {
+  id String @id @default(cuid())
+
+  storeId String
+  store   Store  @relation(fields: [storeId], references: [id])
+
+  emailEnabled    Boolean @default(true)
+  whatsappEnabled Boolean @default(false)
+  smsEnabled      Boolean @default(false)
+
+  emailDelayMin    Int @default(30)
+  whatsappDelayMin Int @default(60)
+  smsDelayMin      Int @default(120)
+
+  emailTemplate    String?
+  whatsappTemplate String?
+  smsTemplate      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

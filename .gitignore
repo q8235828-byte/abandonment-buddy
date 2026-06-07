@@ -1,0 +1,32 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+dist
+.next
+out
+build
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.*.local
+.env.production
+
+# Prisma
+packages/database/node_modules
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode
+.idea
+*.swp

@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Campaign" ADD COLUMN "smsEnabled" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "smsDelayMin" INTEGER NOT NULL DEFAULT 120,
+ADD COLUMN "smsTemplate" TEXT;

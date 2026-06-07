@@ -1,0 +1,13 @@
+{
+  "name": "@abandonment-buddy/database",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev"
+  },
+  "dependencies": {
+    "@prisma/client": "6.8.2",
+    "prisma": "6.8.2"
+  }
+}
