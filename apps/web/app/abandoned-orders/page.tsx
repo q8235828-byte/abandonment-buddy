@@ -311,27 +311,27 @@ export default function AbandonedOrdersPage() {
 
         {/* Stats */}
         <section className="grid gap-4 md:grid-cols-3">
-          <StatCard label="Tracked orders"    value={orders.length}                     helper="All webhook orders"    icon={<ShoppingBag size={19} />} />
-          <StatCard label="Detected carts"    value={totals.detected}                   helper="Awaiting recovery"     icon={<PackageSearch size={19} />} />
-          <StatCard label="Recovered revenue" value={`$${money(totals.revenue)}`} helper={`${totals.recovered} recovered`} icon={<DollarSign size={19} />} />
+          <StatCard label="Tracked orders"    value={orders.length}              helper="All webhook orders"           icon={<ShoppingBag size={18} />}   color="slate" />
+          <StatCard label="Detected carts"    value={totals.detected}            helper="Awaiting recovery"            icon={<PackageSearch size={18} />} color="amber" />
+          <StatCard label="Recovered revenue" value={`$${money(totals.revenue)}`} helper={`${totals.recovered} recovered`} icon={<DollarSign size={18} />}  color="teal" />
         </section>
 
         {/* Table */}
-        <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="grid gap-3 border-b border-slate-200 px-5 py-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex flex-col gap-4 border-b border-slate-100 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-base font-semibold">Order queue</h2>
-              <p className="text-sm text-slate-500">Click <strong>View</strong> to see full customer and cart details.</p>
+              <h2 className="text-sm font-semibold text-slate-900">Order queue</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Click <strong>View</strong> to see full customer and cart details.</p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="relative">
-                <Search size={16} className="absolute left-3 top-3 text-slate-400" />
+                <Search size={15} className="absolute left-3 top-2.5 text-slate-400" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search orders"
-                  className="w-full rounded-lg border border-slate-300 py-2.5 pl-9 pr-3 text-sm sm:w-72" />
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition sm:w-64" />
               </div>
               <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                className="rounded-lg border border-slate-300 px-3 py-2.5 text-sm">
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition">
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{s === 'ALL' ? 'All statuses' : s}</option>
                 ))}
@@ -340,44 +340,53 @@ export default function AbandonedOrdersPage() {
           </div>
 
           {loading ? (
-            <div className="p-5"><LoadingRow label="Loading orders…" /></div>
+            <div className="p-6"><LoadingRow label="Loading orders…" /></div>
           ) : filteredOrders.length === 0 ? (
-            <div className="p-5">
+            <div className="p-6">
               <EmptyState title="No matching orders" description="Try a different search or run detection after webhook orders arrive." />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-5 py-3 text-left font-semibold">Order</th>
-                    <th className="px-5 py-3 text-left font-semibold">Customer</th>
-                    <th className="px-5 py-3 text-left font-semibold">Store</th>
-                    <th className="px-5 py-3 text-left font-semibold">Cart value</th>
-                    <th className="px-5 py-3 text-left font-semibold">Status</th>
-                    <th className="px-5 py-3 text-left font-semibold">Details</th>
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <th className="px-6 py-3">Order</th>
+                    <th className="px-6 py-3">Customer</th>
+                    <th className="px-6 py-3">Store</th>
+                    <th className="px-6 py-3">Cart value</th>
+                    <th className="px-6 py-3">Status</th>
+                    <th className="px-6 py-3">Details</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-50">
                   {filteredOrders.map((order) => {
                     const items = Array.isArray(order.cartSnapshot) ? order.cartSnapshot : [];
+                    const name = order.customerName || order.customerEmail || 'Unknown';
+                    const initials = name.split(' ').map((w: string) => w[0]).join('').slice(0, 2).toUpperCase();
                     return (
-                      <tr key={order.id} className="hover:bg-slate-50">
-                        <td className="px-5 py-4">
+                      <tr key={order.id} className="transition hover:bg-slate-50/70">
+                        <td className="px-6 py-4">
                           <p className="font-mono text-xs font-semibold text-slate-950">{order.externalOrderId}</p>
-                          <p className="mt-1 text-xs text-slate-500">WC: {order.orderStatus || 'unknown'}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">WC: {order.orderStatus || 'unknown'}</p>
                         </td>
-                        <td className="px-5 py-4">
-                          <p className="font-medium text-slate-950">{order.customerName || 'Unknown'}</p>
-                          <p className="text-xs text-slate-500">{order.customerEmail || 'No email'}</p>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                              {initials}
+                            </div>
+                            <div>
+                              <p className="font-medium text-slate-900">{order.customerName || 'Unknown customer'}</p>
+                              <p className="text-xs text-slate-400">{order.customerEmail || 'No email'}</p>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-5 py-4 text-slate-600">{order.store?.name || '—'}</td>
-                        <td className="px-5 py-4">
+                        <td className="px-6 py-4 text-sm text-slate-500">{order.store?.name || '—'}</td>
+                        <td className="px-6 py-4">
                           <p className="font-semibold text-slate-900">${money(order.cartValue)}</p>
                           <p className="text-xs text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</p>
                         </td>
-                        <td className="px-5 py-4"><StatusBadge status={order.status} /></td>
-                        <td className="px-5 py-4">
+                        <td className="px-6 py-4"><StatusBadge status={order.status} /></td>
+                        <td className="px-6 py-4">
                           <button
                             onClick={() => setSelected(order)}
                             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-950 hover:text-white hover:border-slate-950 transition"
