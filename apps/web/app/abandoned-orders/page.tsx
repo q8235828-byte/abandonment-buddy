@@ -33,8 +33,12 @@ function InfoRow({ label, value, mono = false }: { label: string; value: React.R
   );
 }
 
+const money = (v: unknown) => Number(v || 0).toFixed(2);
+
 function OrderDetailModal({ order, onClose }: { order: AbandonedOrder; onClose: () => void }) {
-  const items: CartItem[] = Array.isArray(order.cartSnapshot) ? order.cartSnapshot : [];
+  // cartSnapshot may come as array, object, or null from the API
+  const raw = order.cartSnapshot;
+  const items: CartItem[] = Array.isArray(raw) ? raw : [];
   const nameParts = (order.customerName || '').trim().split(' ');
   const firstName = nameParts[0] || '—';
   const lastName = nameParts.slice(1).join(' ') || '—';
@@ -156,8 +160,8 @@ function OrderDetailModal({ order, onClose }: { order: AbandonedOrder; onClose: 
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center text-slate-600">×{item.quantity}</td>
-                      <td className="px-4 py-3 text-right text-slate-600">${item.price?.toFixed(2)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-slate-900">${item.total?.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-right text-slate-600">${money(item.price)}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-900">${money(item.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -165,7 +169,7 @@ function OrderDetailModal({ order, onClose }: { order: AbandonedOrder; onClose: 
                   <tr>
                     <td colSpan={3} className="px-4 py-3 text-sm font-bold text-slate-700">Cart total</td>
                     <td className="px-4 py-3 text-right text-base font-bold text-slate-950">
-                      ${Number(order.cartValue || 0).toFixed(2)}
+                      ${money(order.cartValue)}
                     </td>
                   </tr>
                 </tfoot>
@@ -309,7 +313,7 @@ export default function AbandonedOrdersPage() {
         <section className="grid gap-4 md:grid-cols-3">
           <StatCard label="Tracked orders"    value={orders.length}                     helper="All webhook orders"    icon={<ShoppingBag size={19} />} />
           <StatCard label="Detected carts"    value={totals.detected}                   helper="Awaiting recovery"     icon={<PackageSearch size={19} />} />
-          <StatCard label="Recovered revenue" value={`$${totals.revenue.toFixed(2)}`}  helper={`${totals.recovered} recovered`} icon={<DollarSign size={19} />} />
+          <StatCard label="Recovered revenue" value={`$${money(totals.revenue)}`} helper={`${totals.recovered} recovered`} icon={<DollarSign size={19} />} />
         </section>
 
         {/* Table */}
@@ -369,7 +373,7 @@ export default function AbandonedOrdersPage() {
                         </td>
                         <td className="px-5 py-4 text-slate-600">{order.store?.name || '—'}</td>
                         <td className="px-5 py-4">
-                          <p className="font-semibold text-slate-900">${Number(order.cartValue || 0).toFixed(2)}</p>
+                          <p className="font-semibold text-slate-900">${money(order.cartValue)}</p>
                           <p className="text-xs text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</p>
                         </td>
                         <td className="px-5 py-4"><StatusBadge status={order.status} /></td>
