@@ -6,11 +6,15 @@ import {
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { BillingService } from '../../billing/billing.service';
 import { CartSessionDto } from '../dto/cart-session.dto';
 
 @Injectable()
 export class WebhooksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private billingService: BillingService,
+  ) {}
 
   // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -69,6 +73,9 @@ export class WebhooksService {
         },
       });
     }
+
+    // New order — increment usage counter for store owner
+    await this.billingService.checkAndIncrementOrders(store.ownerId);
 
     return this.prisma.abandonedOrder.create({
       data: {
