@@ -127,7 +127,7 @@ export default function HomePage() {
       <SiteHeader />
 
       {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="relative overflow-hidden bg-slate-950 pb-0 pt-20 text-white">
+      <section className="relative overflow-hidden bg-slate-950 pb-20 pt-20 text-white">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-10%,rgba(20,184,166,0.15),transparent)]" />
 
         <div className="relative mx-auto max-w-4xl px-4 text-center sm:px-6">
