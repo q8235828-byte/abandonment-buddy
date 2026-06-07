@@ -191,13 +191,6 @@ export default function HomePage() {
             ))}
           </div>
 
-          {/* App mockup — sits flush at the bottom of the dark section */}
-          <div className="relative mx-auto mt-14 max-w-3xl">
-            <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(20,184,166,0.12),transparent_70%)]" />
-            <div className="relative">
-              <AppMockup />
-            </div>
-          </div>
         </div>
       </section>
 
