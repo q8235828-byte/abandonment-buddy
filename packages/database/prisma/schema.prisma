@@ -40,7 +40,7 @@ model Store {
   apiSecret             String
   webhookSecret         String
   status                StoreStatus @default(DISCONNECTED)
-  abandonmentTimeoutMin Int         @default(60)
+  abandonmentTimeoutMin Int         @default(180)
 
   ownerId String
   owner   User   @relation(fields: [ownerId], references: [id])
@@ -70,8 +70,9 @@ model AbandonedOrder {
 
   status AbandonedStatus @default(DETECTED)
 
-  abandonedAt DateTime?
-  recoveredAt DateTime?
+  abandonedAt  DateTime?
+  recoveredAt  DateTime?
+  emailSentAt  DateTime?
 
   storeId String
   store   Store  @relation(fields: [storeId], references: [id])

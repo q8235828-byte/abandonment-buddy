@@ -1,5 +1,6 @@
 
 import { Module } from '@nestjs/common';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { AbandonmentController } from './controllers/abandonment.controller';
 import { AbandonmentService } from './services/abandonment.service';
@@ -9,6 +10,7 @@ import { QueueModule } from '../queues/queue.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     PrismaModule,
     QueueModule,
   ],
