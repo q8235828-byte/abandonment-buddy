@@ -10,7 +10,7 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/database/package.json ./packages/database/
 COPY packages/database/prisma ./packages/database/prisma/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 COPY apps/api ./apps/api
 COPY packages/database ./packages/database
@@ -30,7 +30,7 @@ COPY apps/web/package.json ./apps/web/
 COPY packages/database/package.json ./packages/database/
 COPY packages/database/prisma ./packages/database/prisma/
 
-RUN pnpm install --frozen-lockfile --prod
+RUN pnpm install --no-frozen-lockfile --prod
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
 
