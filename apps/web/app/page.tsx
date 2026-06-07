@@ -2,12 +2,16 @@ import Link from 'next/link';
 import {
   ArrowRight,
   BarChart3,
+  Bitcoin,
   CheckCircle2,
   Clock,
   Mail,
   MessageSquare,
   Plug,
   Shield,
+  ShoppingBag,
+  Smartphone,
+  Sparkles,
   Star,
   TrendingUp,
   Zap,
@@ -342,72 +346,98 @@ export default function HomePage() {
       {/* ── Pricing ──────────────────────────────────────── */}
       <section id="pricing" className="border-t border-slate-100 bg-slate-50 py-24">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
-          <div className="mb-16 text-center">
+          <div className="mb-4 text-center">
             <p className="text-sm font-semibold uppercase tracking-widest text-teal-600">Pricing</p>
             <h2 className="mt-3 text-4xl font-bold tracking-tight">Simple, transparent pricing</h2>
-            <p className="mt-4 text-base text-slate-500">Start free. Upgrade when you&apos;re ready. No hidden fees.</p>
+            <p className="mt-4 text-base text-slate-500">Start free. Upgrade with crypto. No hidden fees.</p>
+          </div>
+
+          {/* Crypto payment badge */}
+          <div className="mb-12 flex justify-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-500 shadow-sm">
+              <Bitcoin size={13} className="text-amber-500" />
+              Paid plans accept Bitcoin, USDT, Ethereum & 100+ cryptocurrencies via NOWPayments
+            </div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             {[
               {
-                name: 'Starter',
-                price: 'Free',
+                name: 'Free',
+                price: '$0',
                 sub: 'forever',
-                desc: 'For small stores testing recovery',
+                desc: 'Get started with basic cart recovery',
                 highlight: false,
                 badge: null,
+                color: 'teal',
+                limits: [
+                  { icon: <ShoppingBag size={13} />, text: '100 orders / month' },
+                  { icon: <Mail size={13} />,        text: '50 emails / month' },
+                  { icon: <Smartphone size={13} />,  text: '20 SMS / month' },
+                  { icon: <MessageSquare size={13} />,text: '20 WhatsApp / month' },
+                ],
                 features: [
-                  '1 WooCommerce store',
-                  '100 cart recoveries / month',
-                  'Email campaigns',
-                  'Basic analytics',
+                  'WooCommerce integration',
+                  'Email recovery campaigns',
+                  'Basic analytics dashboard',
+                  'Custom message templates',
                   'Community support',
                 ],
                 cta: 'Get started free',
                 href: '/signup',
               },
               {
-                name: 'Pro',
-                price: '$29',
+                name: 'Starter',
+                price: '$20',
                 sub: '/ month',
-                desc: 'For growing stores that want more reach',
+                desc: 'For growing stores with more cart traffic',
                 highlight: true,
                 badge: 'Most popular',
+                color: 'teal',
+                limits: [
+                  { icon: <ShoppingBag size={13} />, text: '1,000 orders / month' },
+                  { icon: <Mail size={13} />,        text: '500 emails / month' },
+                  { icon: <Smartphone size={13} />,  text: '200 SMS / month' },
+                  { icon: <MessageSquare size={13} />,text: '200 WhatsApp / month' },
+                ],
                 features: [
-                  '3 WooCommerce stores',
-                  '1,000 cart recoveries / month',
-                  'Email + WhatsApp',
+                  'Everything in Free',
+                  'Email + WhatsApp + SMS',
+                  'Campaign scheduling',
                   'Advanced analytics',
-                  'A/B testing',
                   'Priority support',
                 ],
-                cta: 'Start free trial',
+                cta: 'Upgrade to Starter',
                 href: '/signup',
               },
               {
-                name: 'Business',
-                price: '$79',
+                name: 'Pro',
+                price: '$50',
                 sub: '/ month',
-                desc: 'For high-volume stores and agencies',
+                desc: 'Unlimited recovery for high-volume stores',
                 highlight: false,
                 badge: null,
-                features: [
-                  'Unlimited stores',
-                  'Unlimited recoveries',
-                  'Email + WhatsApp + SMS',
-                  'Full analytics suite',
-                  'Custom templates',
-                  'API & webhooks',
-                  'Dedicated manager',
+                color: 'violet',
+                limits: [
+                  { icon: <ShoppingBag size={13} />, text: 'Unlimited orders' },
+                  { icon: <Mail size={13} />,        text: 'Unlimited emails' },
+                  { icon: <Smartphone size={13} />,  text: 'Unlimited SMS' },
+                  { icon: <MessageSquare size={13} />,text: 'Unlimited WhatsApp' },
                 ],
-                cta: 'Contact sales',
+                features: [
+                  'Everything in Starter',
+                  'Unlimited everything',
+                  'Multi-store management',
+                  'Advanced analytics',
+                  'Dedicated support',
+                ],
+                cta: 'Upgrade to Pro',
                 href: '/signup',
               },
             ].map((plan) => (
               <div
                 key={plan.name}
-                className={`relative flex flex-col rounded-2xl border p-8 ${
+                className={`relative flex flex-col rounded-2xl border-2 p-8 ${
                   plan.highlight
                     ? 'border-teal-500 bg-slate-950 text-white shadow-xl shadow-teal-500/10'
                     : 'border-slate-200 bg-white shadow-sm'
@@ -415,31 +445,37 @@ export default function HomePage() {
               >
                 {plan.badge && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="rounded-full bg-teal-500 px-4 py-1 text-xs font-bold text-white">
-                      {plan.badge}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-teal-500 px-4 py-1 text-xs font-bold text-white">
+                      <Sparkles size={10} /> {plan.badge}
                     </span>
                   </div>
                 )}
 
-                <div className="mb-6">
-                  <p className={`text-xs font-bold uppercase tracking-widest ${plan.highlight ? 'text-teal-400' : 'text-teal-600'}`}>
+                <div className="mb-5">
+                  <p className={`text-xs font-bold uppercase tracking-widest ${plan.highlight ? 'text-teal-400' : plan.color === 'violet' ? 'text-violet-600' : 'text-teal-600'}`}>
                     {plan.name}
                   </p>
-                  <div className="mt-3 flex items-end gap-1.5">
+                  <div className="mt-2 flex items-end gap-1.5">
                     <span className="text-4xl font-black">{plan.price}</span>
-                    <span className={`mb-1 text-sm ${plan.highlight ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {plan.sub}
-                    </span>
+                    <span className={`mb-1 text-sm ${plan.highlight ? 'text-slate-400' : 'text-slate-500'}`}>{plan.sub}</span>
                   </div>
-                  <p className={`mt-2 text-sm ${plan.highlight ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {plan.desc}
-                  </p>
+                  <p className={`mt-1.5 text-sm ${plan.highlight ? 'text-slate-400' : 'text-slate-500'}`}>{plan.desc}</p>
                 </div>
 
-                <ul className="mb-8 flex-1 space-y-2.5">
+                {/* Usage limits grid */}
+                <div className="mb-5 grid grid-cols-2 gap-2">
+                  {plan.limits.map((l) => (
+                    <div key={l.text} className={`rounded-lg px-3 py-2 ${plan.highlight ? 'bg-white/10' : 'bg-slate-50'}`}>
+                      <div className={`flex items-center gap-1 text-xs mb-0.5 ${plan.highlight ? 'text-slate-400' : 'text-slate-400'}`}>{l.icon}</div>
+                      <p className={`text-xs font-semibold ${plan.highlight ? 'text-slate-200' : 'text-slate-700'}`}>{l.text}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <ul className="mb-8 flex-1 space-y-2">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2.5">
-                      <CheckCircle2 size={15} className={`mt-0.5 shrink-0 ${plan.highlight ? 'text-teal-400' : 'text-teal-500'}`} />
+                      <CheckCircle2 size={14} className={`mt-0.5 shrink-0 ${plan.highlight ? 'text-teal-400' : plan.color === 'violet' ? 'text-violet-500' : 'text-teal-500'}`} />
                       <span className={`text-sm ${plan.highlight ? 'text-slate-300' : 'text-slate-600'}`}>{f}</span>
                     </li>
                   ))}
@@ -450,11 +486,32 @@ export default function HomePage() {
                   className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold transition-colors ${
                     plan.highlight
                       ? 'bg-teal-500 text-white hover:bg-teal-400'
-                      : 'bg-slate-950 text-white hover:bg-slate-800'
+                      : plan.color === 'violet'
+                        ? 'bg-violet-600 text-white hover:bg-violet-500'
+                        : 'bg-slate-950 text-white hover:bg-slate-800'
                   }`}
                 >
                   {plan.cta} <ArrowRight size={14} />
                 </Link>
+
+                {plan.price !== '$0' && (
+                  <p className={`mt-3 text-center text-xs ${plan.highlight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Pay with crypto · Instant activation
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Comparison footnote */}
+          <div className="mt-10 grid gap-3 sm:grid-cols-3 text-center">
+            {[
+              { icon: <Bitcoin size={14} className="text-amber-500" />, text: 'Bitcoin, USDT, ETH & 100+ coins accepted' },
+              { icon: <Zap size={14} className="text-teal-500" />,     text: 'Plan activates instantly on payment confirmation' },
+              { icon: <Shield size={14} className="text-slate-500" />, text: 'Cancel any time · No contracts' },
+            ].map((n) => (
+              <div key={n.text} className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                {n.icon} {n.text}
               </div>
             ))}
           </div>
