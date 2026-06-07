@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   AlertTriangle, CheckCircle2, CreditCard, DollarSign, Globe,
   Loader2, Mail, MapPin, Monitor, PackageSearch, RefreshCcw,
@@ -233,6 +234,7 @@ function UserModal({ user, onClose, onUpdated }: { user: AdminUser; onClose: () 
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
+  const router = useRouter();
   const [stats, setStats]     = useState<Stats | null>(null);
   const [users, setUsers]     = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,12 +251,21 @@ export default function AdminPage() {
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);
-    } catch (err) {
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 401 || status === 403) {
+        router.push('/admin/login');
+        return;
+      }
       setError(getApiErrorMessage(err, 'Admin access denied or failed to load'));
     } finally { setLoading(false); }
   };
 
-  useEffect(() => { void loadData(); }, []);
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) { router.push('/admin/login'); return; }
+    void loadData();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => { e.preventDefault(); void loadData(search); };
 
