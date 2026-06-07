@@ -401,53 +401,15 @@ export default function TemplatesPage() {
         ) : (
           <>
             <section className="grid gap-4 md:grid-cols-4">
-              <StatCard
-                label="Store"
-                value={
-                  selectedStore?.name ||
-                  'None'
-                }
-                helper={
-                  selectedStore?.domain ||
-                  'Select a store'
-                }
-                icon={<Mail size={19} />}
-              />
-              <StatCard
-                label="Email"
-                value={`${emailDelay}m`}
-                helper={
-                  emailEnabled
-                    ? 'Enabled'
-                    : 'Disabled'
-                }
-                icon={<Mail size={19} />}
-              />
-              <StatCard
-                label="WhatsApp"
-                value={`${whatsappDelay}m`}
-                helper={
-                  whatsappEnabled
-                    ? 'Enabled'
-                    : 'Disabled'
-                }
-                icon={<MessageCircle size={19} />}
-              />
-              <StatCard
-                label="SMS"
-                value={`${smsDelay}m`}
-                helper={
-                  smsEnabled
-                    ? 'Enabled'
-                    : 'Disabled'
-                }
-                icon={<Smartphone size={19} />}
-              />
+              <StatCard label="Store"    value={selectedStore?.name || 'None'} helper={selectedStore?.domain || 'Select a store'} icon={<Mail size={18} />}          color="slate" />
+              <StatCard label="Email"    value={`${emailDelay}m`}    helper={emailEnabled    ? 'Enabled' : 'Disabled'} icon={<Mail size={18} />}          color="teal" />
+              <StatCard label="WhatsApp" value={`${whatsappDelay}m`} helper={whatsappEnabled ? 'Enabled' : 'Disabled'} icon={<MessageCircle size={18} />} color="violet" />
+              <StatCard label="SMS"      value={`${smsDelay}m`}      helper={smsEnabled      ? 'Enabled' : 'Disabled'} icon={<Smartphone size={18} />}    color="amber" />
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[1.55fr_0.8fr]">
               <div className="space-y-6">
-                <div className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_0.9fr]">
+                <div className="grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-[1fr_0.9fr]">
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-slate-700">
                       Store
@@ -459,7 +421,7 @@ export default function TemplatesPage() {
                           e.target.value,
                         )
                       }
-                      className="w-full rounded-lg border border-slate-300 px-3 py-3 text-sm"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition"
                     >
                       {stores.map((store) => (
                         <option
@@ -505,7 +467,7 @@ export default function TemplatesPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   {campaignLoading && (
                     <div className="mb-4">
                       <LoadingRow label="Loading saved template..." />
@@ -673,7 +635,7 @@ export default function TemplatesPage() {
               </div>
 
               <aside className="space-y-6">
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h2 className="text-base font-semibold text-slate-950">
                     Control panel
                   </h2>
@@ -732,7 +694,7 @@ export default function TemplatesPage() {
                   </label>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h2 className="text-base font-semibold text-slate-950">
                     Preview data
                   </h2>
@@ -872,7 +834,7 @@ function PreviewInput({
         onChange={(e) =>
           onChange(e.target.value)
         }
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition"
       />
     </label>
   );
