@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle, ArrowRight, CheckCircle2, Clock, FileText,
   Loader2, Mail, MessageCircle, Pause, Play, Save,
-  Send, Smartphone, Store as StoreIcon, Zap,
+  Send, Smartphone, Store as StoreIcon, X, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { AppShell } from '../components/AppShell';
@@ -15,6 +15,24 @@ import {
   DEFAULT_EMAIL_TEMPLATE, DEFAULT_SMS_TEMPLATE,
   DEFAULT_WHATSAPP_TEMPLATE, TEMPLATE_TOKENS, renderTemplate,
 } from '../lib/templates';
+
+// ── Toast notification ────────────────────────────────────────────────────────
+function Toast({ type, msg, onClose }: { type: 'success' | 'error'; msg: string; onClose: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 4000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-2xl border px-5 py-3.5 shadow-xl backdrop-blur-sm transition-all ${
+      type === 'success' ? 'border-teal-200 bg-teal-50 text-teal-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+    }`}>
+      {type === 'success' ? <CheckCircle2 size={16} className="shrink-0" /> : <AlertTriangle size={16} className="shrink-0" />}
+      <span className="text-sm font-medium">{msg}</span>
+      <button onClick={onClose} className="ml-2 opacity-50 hover:opacity-100"><X size={14} /></button>
+    </div>
+  );
+}
 
 // ── Toggle ────────────────────────────────────────────────────────────────────
 function Toggle({ checked, onChange, size = 'md' }: { checked: boolean; onChange: (v: boolean) => void; size?: 'sm' | 'md' }) {
@@ -221,6 +239,7 @@ export default function CampaignsPage() {
   const [testing, setTesting]                 = useState<string | null>(null);
   const [message, setMessage]                 = useState('');
   const [error, setError]                     = useState('');
+  const [toast, setToast]                     = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   const selectedStore = useMemo(() => stores.find((s) => s.id === selectedStoreId), [selectedStoreId, stores]);
   const emailPreview    = useMemo(() => renderTemplate(emailTemplate),    [emailTemplate]);
@@ -279,20 +298,20 @@ export default function CampaignsPage() {
         emailDelayMin: emailDelay, whatsappDelayMin: whatsappDelay, smsDelayMin: smsDelay,
         emailTemplate, whatsappTemplate, smsTemplate,
       });
-      setMessage('Campaign saved successfully.');
+      setToast({ type: 'success', msg: 'Campaign saved successfully.' });
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Failed to save campaign'));
+      setToast({ type: 'error', msg: getApiErrorMessage(err, 'Failed to save campaign') });
     } finally { setSaving(false); }
   };
 
   const handleTest = async (channel: string) => {
-    if (!selectedStoreId) { setError('Select a store first.'); return; }
-    setTesting(channel); setMessage(''); setError('');
+    if (!selectedStoreId) { setToast({ type: 'error', msg: 'Select a store first.' }); return; }
+    setTesting(channel);
     try {
       await api.post(`/stores/${selectedStoreId}/test-email`);
-      setMessage(`Test ${channel} sent successfully! Check your inbox.`);
+      setToast({ type: 'success', msg: `Test ${channel} sent! Check your inbox.` });
     } catch (err) {
-      setError(getApiErrorMessage(err, `Failed to send test ${channel}`));
+      setToast({ type: 'error', msg: getApiErrorMessage(err, `Failed to send test ${channel}`) });
     } finally { setTesting(null); }
   };
 
@@ -312,6 +331,8 @@ export default function CampaignsPage() {
         </div>
       }
     >
+      {toast && <Toast type={toast.type} msg={toast.msg} onClose={() => setToast(null)} />}
+
       <div className="space-y-6">
         {error   && <Alert type="error">{error}</Alert>}
         {message && <Alert type="success">{message}</Alert>}
