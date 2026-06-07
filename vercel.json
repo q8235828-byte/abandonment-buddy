@@ -1,6 +1,6 @@
 {
-  "installCommand": "npx --yes pnpm@10 install --no-frozen-lockfile",
-  "buildCommand": "npx pnpm@10 --filter web build",
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm --filter web build",
   "outputDirectory": "apps/web/.next",
   "framework": "nextjs"
 }
