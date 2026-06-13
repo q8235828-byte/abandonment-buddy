@@ -187,6 +187,9 @@ model Campaign {
   whatsappTemplate String?
   smsTemplate      String?
 
+  // Which built-in template style to use when emailTemplate is null
+  templateId       String  @default("classic") // classic | minimal | urgent | friendly
+
   // Email sequence step 2 (e.g. 24h follow-up)
   emailStep2DelayMin Int?
   emailStep2Subject  String?

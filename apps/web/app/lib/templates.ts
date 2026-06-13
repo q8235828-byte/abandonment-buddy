@@ -246,6 +246,104 @@ export const DEFAULT_EMAIL_TEMPLATE = `<!DOCTYPE html>
 </body>
 </html>`;
 
+// ── Pre-built template catalogue ──────────────────────────────────────────────
+export type TemplateId = 'classic' | 'minimal' | 'urgent' | 'friendly' | 'custom';
+
+export interface PrebuiltTemplate {
+  id: TemplateId;
+  name: string;
+  description: string;
+  tag: string;
+  tagColor: string;
+  previewBg: string;
+  previewAccent: string;
+  previewHtml: string; // simplified preview snippet shown in the picker
+}
+
+export const PREBUILT_TEMPLATES: PrebuiltTemplate[] = [
+  {
+    id: 'classic',
+    name: 'Classic',
+    description: 'Dark header, clean layout, teal CTA. Professional and proven.',
+    tag: 'Most Popular',
+    tagColor: 'teal',
+    previewBg: '#f1f5f9',
+    previewAccent: '#0d9488',
+    previewHtml: `<div style="font-family:sans-serif;background:#f1f5f9;padding:12px;border-radius:8px;">
+      <div style="background:#0f172a;color:#fff;padding:10px;border-radius:6px 6px 0 0;text-align:center;font-size:11px;font-weight:800;letter-spacing:.05em;">YOUR STORE · CART RECOVERY</div>
+      <div style="background:#fff;padding:12px;border-radius:0 0 6px 6px;">
+        <div style="font-size:11px;font-weight:700;color:#0f172a;margin-bottom:6px;">Hey Sarah, you left something behind! 🛒</div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:6px;font-size:9px;color:#475569;margin-bottom:8px;">📦 Premium Headphones ×1 · $59.99</div>
+        <div style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:4px;padding:6px;font-size:9px;color:#065f46;margin-bottom:8px;">🎁 Use code COMEBACK5 — 5% OFF</div>
+        <div style="background:#0d9488;color:#fff;text-align:center;padding:6px;border-radius:4px;font-size:9px;font-weight:700;">✅ Complete My Order →</div>
+      </div>
+    </div>`,
+  },
+  {
+    id: 'minimal',
+    name: 'Minimal',
+    description: 'Clean white, serif-inspired, no heavy header. Elegant and understated.',
+    tag: 'Premium Look',
+    tagColor: 'slate',
+    previewBg: '#ffffff',
+    previewAccent: '#0f172a',
+    previewHtml: `<div style="font-family:Georgia,serif;background:#fff;padding:12px;border-radius:8px;border:1px solid #e2e8f0;">
+      <div style="border-bottom:2px solid #0f172a;padding-bottom:8px;margin-bottom:10px;">
+        <span style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-family:sans-serif;color:#0f172a;">YOUR STORE</span>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:#94a3b8;font-family:sans-serif;margin-bottom:3px;">Hi Sarah,</div>
+      <div style="font-size:13px;color:#0f172a;margin-bottom:8px;line-height:1.4;">You left something in your cart.</div>
+      <div style="border:1px solid #e2e8f0;border-radius:4px;padding:6px;font-size:9px;color:#475569;margin-bottom:8px;font-family:sans-serif;">Premium Headphones · $59.99</div>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:6px 8px;font-size:9px;font-family:sans-serif;margin-bottom:8px;color:#0f172a;">Code: <strong>COMEBACK5</strong> — 5% off</div>
+      <div style="background:#0f172a;color:#fff;text-align:center;padding:6px;border-radius:4px;font-size:9px;font-weight:600;font-family:sans-serif;">Complete your order →</div>
+    </div>`,
+  },
+  {
+    id: 'urgent',
+    name: 'Urgent',
+    description: 'Red urgency banner, bold countdown copy. Maximum pressure for last-chance emails.',
+    tag: 'High Converting',
+    tagColor: 'red',
+    previewBg: '#fafafa',
+    previewAccent: '#dc2626',
+    previewHtml: `<div style="font-family:sans-serif;background:#fafafa;padding:12px;border-radius:8px;">
+      <div style="background:#dc2626;color:#fff;padding:7px;border-radius:6px 6px 0 0;text-align:center;font-size:9px;font-weight:800;letter-spacing:.04em;">⚠️ CART EXPIRING IN 24 HOURS — ACT NOW</div>
+      <div style="background:#fff;padding:12px;border-radius:0 0 6px 6px;border:1px solid #fecdd3;border-top:none;">
+        <div style="font-size:11px;font-weight:900;color:#0f172a;margin-bottom:6px;">Sarah, your $84.49 cart is about to expire!</div>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:4px;padding:6px;font-size:9px;color:#475569;margin-bottom:7px;">📦 Premium Headphones ×1 · $59.99</div>
+        <div style="background:#fff1f2;border:2px solid #fecdd3;border-radius:4px;padding:6px;text-align:center;margin-bottom:7px;">
+          <div style="font-size:10px;font-weight:900;color:#dc2626;">🎁 COMEBACK5 — 5% OFF</div>
+          <div style="font-size:8px;color:#f43f5e;font-weight:600;">⏰ Expires in 24 hours</div>
+        </div>
+        <div style="background:#dc2626;color:#fff;text-align:center;padding:7px;border-radius:5px;font-size:9px;font-weight:900;">🛒 COMPLETE MY ORDER NOW →</div>
+      </div>
+    </div>`,
+  },
+  {
+    id: 'friendly',
+    name: 'Friendly',
+    description: 'Warm amber tones, emoji-rich, conversational. Feels personal, not automated.',
+    tag: 'High Engagement',
+    tagColor: 'amber',
+    previewBg: '#fffbeb',
+    previewAccent: '#d97706',
+    previewHtml: `<div style="font-family:sans-serif;background:#fffbeb;padding:12px;border-radius:8px;">
+      <div style="background:linear-gradient(135deg,#fef9c3,#fef3c7);padding:10px;border-radius:6px 6px 0 0;text-align:center;border:1px solid #fde68a;border-bottom:none;">
+        <div style="font-size:18px;line-height:1;">🛍️</div>
+        <div style="font-size:10px;font-weight:800;color:#92400e;margin-top:3px;">YOUR STORE</div>
+      </div>
+      <div style="background:#fff;padding:12px;border-radius:0 0 6px 6px;border:1px solid #fde68a;border-top:none;">
+        <div style="font-size:11px;font-weight:800;color:#1c1917;margin-bottom:5px;">Hey Sarah! 👋 You forgot something awesome!</div>
+        <div style="background:#f5f5f4;border-radius:4px;padding:6px;font-size:9px;color:#57534e;margin-bottom:7px;">📦 Premium Headphones · $59.99</div>
+        <div style="background:linear-gradient(135deg,#fef9c3,#fef3c7);border:2px solid #fde68a;border-radius:6px;padding:7px;margin-bottom:7px;">
+          <div style="font-size:9px;font-weight:800;color:#92400e;">🎁 5% off with code COMEBACK5</div>
+        </div>
+        <div style="background:linear-gradient(135deg,#f59e0b,#d97706);color:#fff;text-align:center;padding:7px;border-radius:50px;font-size:9px;font-weight:800;">Grab My Cart 🛒</div>
+      </div>
+    </div>`,
+  },
+];
+
 // ── WhatsApp template ─────────────────────────────────────────────────────────
 export const DEFAULT_WHATSAPP_TEMPLATE = `Hi {{customerName}} 👋
 

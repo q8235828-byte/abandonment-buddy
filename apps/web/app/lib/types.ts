@@ -99,6 +99,7 @@ export type Campaign = {
   emailDelayMin: number;
   whatsappDelayMin: number;
   smsDelayMin: number;
+  templateId?: string | null;
   emailTemplate?: string | null;
   whatsappTemplate?: string | null;
   smsTemplate?: string | null;
@@ -125,6 +126,7 @@ export type CampaignPayload = {
   emailDelayMin: number;
   whatsappDelayMin: number;
   smsDelayMin: number;
+  templateId?: string;
   emailTemplate: string;
   whatsappTemplate: string;
   smsTemplate: string;

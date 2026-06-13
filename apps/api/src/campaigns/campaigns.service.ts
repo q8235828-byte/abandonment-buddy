@@ -23,6 +23,7 @@ export class CampaignsService {
     assign('emailDelayMin',     data.emailDelayMin);
     assign('whatsappDelayMin',  data.whatsappDelayMin);
     assign('smsDelayMin',       data.smsDelayMin);
+    assign('templateId',         data.templateId);
     assign('emailTemplate',     data.emailTemplate);
     assign('whatsappTemplate',  data.whatsappTemplate);
     assign('smsTemplate',       data.smsTemplate);

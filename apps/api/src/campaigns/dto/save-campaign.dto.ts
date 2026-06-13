@@ -64,6 +64,11 @@ export class SaveCampaignDto {
   @IsOptional() @IsString()
   emailStep3Template?: string;
 
+  // Template style
+  @ApiPropertyOptional({ description: 'classic | minimal | urgent | friendly' })
+  @IsOptional() @IsString()
+  templateId?: string;
+
   // A/B testing
   @ApiPropertyOptional({ default: false })
   @IsOptional() @IsBoolean()

@@ -214,7 +214,7 @@ export default function HomePage() {
           <div className="grid divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             {[
               { value: '69.8%', label: 'of all online carts are abandoned before checkout' },
-              { value: '3×', label: 'more revenue when you follow up within the first hour' },
+              { value: '5×', label: 'more revenue when you follow up within the first hour' },
               { value: '47%', label: 'average recovery rate for stores using Abandonment Buddy' },
             ].map((s) => (
               <div key={s.value} className="px-8 py-8 text-center first:pl-0 last:pr-0 sm:py-0">

@@ -12,8 +12,9 @@ import { Alert, EmptyState, LoadingRow, StatCard } from '../components/Ui';
 import { api, getApiErrorMessage, saveCampaign } from '../lib/api';
 import type { Campaign, Store } from '../lib/types';
 import {
-  DEFAULT_EMAIL_TEMPLATE, DEFAULT_SMS_TEMPLATE,
-  DEFAULT_WHATSAPP_TEMPLATE, TEMPLATE_TOKENS, renderTemplate,
+  DEFAULT_SMS_TEMPLATE, DEFAULT_WHATSAPP_TEMPLATE,
+  TEMPLATE_TOKENS, renderTemplate,
+  PREBUILT_TEMPLATES,
 } from '../lib/templates';
 
 // ── Toast ─────────────────────────────────────────────────────────────────────
@@ -253,6 +254,69 @@ function StepDelayRow({ label, value, onChange, enabled, onEnabledChange }: {
   );
 }
 
+// ── Template picker ───────────────────────────────────────────────────────────
+const TAG_COLORS: Record<string, string> = {
+  teal:  'bg-teal-100 text-teal-700',
+  slate: 'bg-slate-100 text-slate-600',
+  red:   'bg-red-100 text-red-700',
+  amber: 'bg-amber-100 text-amber-700',
+};
+
+function TemplatePicker({ selectedId, isCustom, onSelect }: {
+  selectedId: string; isCustom: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center gap-3 border-b border-slate-100 pb-4">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50">
+          <FileText size={17} className="text-slate-500" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Email template style</h2>
+          <p className="text-xs text-slate-400">Pick a pre-built style, or select Custom HTML to write your own</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-3">
+        {PREBUILT_TEMPLATES.map((tpl) => {
+          const active = !isCustom && selectedId === tpl.id;
+          return (
+            <button key={tpl.id} type="button" onClick={() => onSelect(tpl.id)}
+              className={`group flex flex-col overflow-hidden rounded-xl border-2 transition-all text-left ${
+                active ? 'border-teal-500 ring-2 ring-teal-500/20 shadow-md' : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
+              }`}>
+              <div className="h-[130px] w-full overflow-hidden pointer-events-none select-none"
+                dangerouslySetInnerHTML={{ __html: tpl.previewHtml }} />
+              <div className={`px-3 py-2 border-t ${active ? 'bg-teal-50 border-teal-200' : 'bg-white border-slate-100'}`}>
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className="text-xs font-bold text-slate-900">{tpl.name}</span>
+                  {active && <CheckCircle2 size={12} className="text-teal-500 shrink-0" />}
+                </div>
+                <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${TAG_COLORS[tpl.tagColor] ?? 'bg-slate-100 text-slate-600'}`}>
+                  {tpl.tag}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <button type="button" onClick={() => onSelect('custom')}
+        className={`w-full flex items-center gap-3 rounded-xl border-2 px-4 py-3 transition-all text-left ${
+          isCustom ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-400/20' : 'border-slate-200 bg-slate-50 hover:border-slate-300'
+        }`}>
+        <FileText size={16} className={isCustom ? 'text-violet-500' : 'text-slate-400'} />
+        <div className="flex-1">
+          <p className={`text-xs font-semibold ${isCustom ? 'text-violet-700' : 'text-slate-700'}`}>Custom HTML</p>
+          <p className="text-[11px] text-slate-400">Write your own HTML email using tokens like {'{{FIRST_NAME}}'}, {'{{CART_VALUE}}'}</p>
+        </div>
+        {isCustom && <CheckCircle2 size={14} className="text-violet-500 shrink-0" />}
+      </button>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function CampaignsPage() {
   const [stores, setStores]                     = useState<Store[]>([]);
@@ -264,7 +328,8 @@ export default function CampaignsPage() {
   const [emailDelay, setEmailDelay]             = useState(180);
   const [whatsappDelay, setWhatsappDelay]       = useState(240);
   const [smsDelay, setSmsDelay]                 = useState(360);
-  const [emailTemplate, setEmailTemplate]       = useState(DEFAULT_EMAIL_TEMPLATE);
+  const [templateId, setTemplateId]             = useState('classic');
+  const [emailTemplate, setEmailTemplate]       = useState('');
   const [whatsappTemplate, setWhatsappTemplate] = useState(DEFAULT_WHATSAPP_TEMPLATE);
   const [smsTemplate, setSmsTemplate]           = useState(DEFAULT_SMS_TEMPLATE);
 
@@ -323,7 +388,13 @@ export default function CampaignsPage() {
       setEmailDelay(c.emailDelayMin);
       setWhatsappDelay(c.whatsappDelayMin);
       setSmsDelay(c.smsDelayMin);
-      setEmailTemplate(c.emailTemplate || DEFAULT_EMAIL_TEMPLATE);
+      if (c.emailTemplate && c.emailTemplate.trim().startsWith('<')) {
+        setTemplateId('custom');
+        setEmailTemplate(c.emailTemplate);
+      } else {
+        setTemplateId((c as any).templateId || 'classic');
+        setEmailTemplate('');
+      }
       setWhatsappTemplate(c.whatsappTemplate || DEFAULT_WHATSAPP_TEMPLATE);
       setSmsTemplate(c.smsTemplate || DEFAULT_SMS_TEMPLATE);
       setStep2Enabled(!!c.emailStep2DelayMin);
@@ -349,10 +420,13 @@ export default function CampaignsPage() {
     if (!selectedStoreId) { setError('Please select a store first.'); return; }
     try {
       setSaving(true); setError('');
+      const isCustom = templateId === 'custom';
       await saveCampaign(selectedStoreId, {
         emailEnabled, whatsappEnabled, smsEnabled,
         emailDelayMin: emailDelay, whatsappDelayMin: whatsappDelay, smsDelayMin: smsDelay,
-        emailTemplate, whatsappTemplate, smsTemplate,
+        templateId: isCustom ? '' : templateId,
+        emailTemplate: isCustom ? emailTemplate : '',
+        whatsappTemplate, smsTemplate,
         emailStep2DelayMin: step2Enabled ? step2Delay : undefined,
         emailStep2Subject:  step2Enabled ? step2Subject : undefined,
         emailStep2Template: step2Enabled ? step2Template : undefined,
@@ -367,6 +441,11 @@ export default function CampaignsPage() {
     } catch (err) {
       setToast({ type: 'error', msg: getApiErrorMessage(err, 'Failed to save campaign') });
     } finally { setSaving(false); }
+  };
+
+  const handleTemplateSelect = (id: string) => {
+    setTemplateId(id);
+    if (id !== 'custom') setEmailTemplate('');
   };
 
   const handleTest = async (channel: string) => {
@@ -521,7 +600,14 @@ export default function CampaignsPage() {
                   </div>
 
                   {emailEnabled && (
-                    <TemplateEditor title="Email template (Step 1)" channel="email" value={emailTemplate} preview={emailPreview} onChange={setEmailTemplate} onReset={() => setEmailTemplate(DEFAULT_EMAIL_TEMPLATE)} />
+                    <TemplatePicker
+                      selectedId={templateId}
+                      isCustom={templateId === 'custom'}
+                      onSelect={handleTemplateSelect}
+                    />
+                  )}
+                  {emailEnabled && templateId === 'custom' && (
+                    <TemplateEditor title="Email template (Step 1)" channel="email" value={emailTemplate} preview={emailPreview} onChange={setEmailTemplate} onReset={() => setEmailTemplate('')} />
                   )}
                   {whatsappEnabled && (
                     <TemplateEditor title="WhatsApp template" channel="whatsapp" value={whatsappTemplate} preview={wappPreview} onChange={setWhatsappTemplate} />
