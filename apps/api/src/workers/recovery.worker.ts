@@ -11,13 +11,18 @@ const redisConnection = new IORedis(
 );
 
 // ── Smart offer based on cart value ──────────────────────────────────────────
-function getSmartOffer(cartValue: number) {
+function getSmartOffer(cartValue: number, step: number) {
+  // Step 2 & 3 get more aggressive discounts
+  if (step >= 2) {
+    if (cartValue >= 150) return { headline: '🎁 Last chance — 15% off your order', subline: 'Use code <strong>SAVE15</strong> at checkout. This is your final reminder — offer expires today!', code: 'SAVE15', badgeLabel: '15% OFF', badgeColor: '#7c3aed' };
+    if (cartValue >= 50)  return { headline: '💰 Final offer — 10% off just for you', subline: 'Use code <strong>SAVE10</strong> at checkout. This offer won\'t be extended.', code: 'SAVE10', badgeLabel: '10% OFF', badgeColor: '#0d9488' };
+    return { headline: '🚚 Free shipping + free returns', subline: 'Use code <strong>FREESHIP</strong> at checkout. Final offer — don\'t miss out!', code: 'FREESHIP', badgeLabel: 'FREE SHIP', badgeColor: '#0891b2' };
+  }
   if (cartValue >= 150) return { headline: '🎁 Exclusive 10% off — just for you', subline: 'Use code <strong>SAVE10</strong> at checkout for 10% off your entire order. Valid 24 hours only.', code: 'SAVE10', badgeLabel: '10% OFF', badgeColor: '#7c3aed' };
   if (cartValue >= 50)  return { headline: '💰 5% off to help you complete your order', subline: 'Use code <strong>COMEBACK5</strong> at checkout. Valid for the next 24 hours only.', code: 'COMEBACK5', badgeLabel: '5% OFF', badgeColor: '#0d9488' };
   return { headline: '🚚 Free shipping on your order!', subline: 'Use code <strong>FREESHIP</strong> at checkout to get free shipping.', code: 'FREESHIP', badgeLabel: 'FREE SHIP', badgeColor: '#0891b2' };
 }
 
-// ── Build cart items HTML ─────────────────────────────────────────────────────
 function buildCartItemsHtml(items: any[]): string {
   if (!items?.length) return '<tr><td colspan="4" style="padding:16px;color:#94a3b8;text-align:center;font-size:13px;">Cart items</td></tr>';
   return items.map((item: any) => `
@@ -32,7 +37,6 @@ function buildCartItemsHtml(items: any[]): string {
     </tr>`).join('');
 }
 
-// ── Fill campaign template or use built-in smart template ─────────────────────
 function buildEmailHtml(params: {
   template: string | null;
   customerName: string | null;
@@ -41,10 +45,11 @@ function buildEmailHtml(params: {
   cartValue: number;
   cartItems: any[];
   recoveryLink: string;
+  step: number;
 }): string {
-  const { template, customerName, storeName, storeUrl, cartValue, cartItems, recoveryLink } = params;
+  const { template, customerName, storeName, storeUrl, cartValue, cartItems, recoveryLink, step } = params;
   const name = customerName || 'there';
-  const offer = getSmartOffer(cartValue);
+  const offer = getSmartOffer(cartValue, step);
 
   const cartItemsHtml = `
 <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
@@ -59,7 +64,6 @@ function buildEmailHtml(params: {
   <tbody>${buildCartItemsHtml(cartItems)}</tbody>
 </table>`;
 
-  // If campaign has a custom template, fill it with tokens
   if (template && template.trim().startsWith('<')) {
     return template
       .replaceAll('{{customerName}}',    name)
@@ -76,7 +80,12 @@ function buildEmailHtml(params: {
       .replaceAll('{{unsubscribeLink}}', `${process.env.FRONTEND_URL || ''}/unsubscribe`);
   }
 
-  // Built-in smart HTML email
+  const stepHeadlines: Record<number, string> = {
+    1: `Hey ${name}, you left something behind! 🛒`,
+    2: `${name}, your cart is still waiting ⏰`,
+    3: `Last chance, ${name} — your cart expires today! 🚨`,
+  };
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>Your cart is waiting — ${storeName}</title></head>
@@ -87,11 +96,11 @@ function buildEmailHtml(params: {
 
   <tr><td style="background:#0f172a;padding:28px 40px;text-align:center;">
     <p style="margin:0;font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">${storeName}</p>
-    <p style="margin:6px 0 0;font-size:12px;color:#64748b;letter-spacing:.04em;">CART RECOVERY</p>
+    <p style="margin:6px 0 0;font-size:12px;color:#64748b;letter-spacing:.04em;">CART RECOVERY${step > 1 ? ` · REMINDER ${step}` : ''}</p>
   </td></tr>
 
   <tr><td style="padding:36px 40px 20px;">
-    <h1 style="margin:0 0 14px;font-size:26px;font-weight:800;color:#0f172a;line-height:1.25;">Hey ${name}, you left something behind! 🛒</h1>
+    <h1 style="margin:0 0 14px;font-size:26px;font-weight:800;color:#0f172a;line-height:1.25;">${stepHeadlines[step] || stepHeadlines[1]}</h1>
     <p style="margin:0;font-size:15px;color:#475569;line-height:1.7;">You added <strong style="color:#0f172a;">$${cartValue.toFixed(2)}</strong> worth of items to your cart at <strong style="color:#0f172a;">${storeName}</strong> but didn't complete checkout. No worries — we saved everything for you.</p>
   </td></tr>
 
@@ -137,6 +146,7 @@ function buildEmailHtml(params: {
     <p style="margin:0;font-size:12px;color:#94a3b8;">Button not working? <a href="${recoveryLink}" style="color:#0d9488;">Click here to open your cart</a></p>
   </td></tr>
 
+  ${step < 3 ? `
   <tr><td style="padding:0 40px 32px;">
     <table width="100%" cellpadding="0" cellspacing="0"><tr>
       <td style="padding:20px 22px;background:#fafafa;border-radius:12px;border:1px solid #e2e8f0;">
@@ -148,26 +158,23 @@ function buildEmailHtml(params: {
           </td>
           <td width="50%" valign="top" style="padding-left:12px;border-left:1px solid #e2e8f0;">
             <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#475569;">🔄 Page not loading?</p>
-            <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;">Clear browser cookies or try a different browser. Your cart is saved — nothing will be lost.</p>
+            <p style="margin:0;font-size:12px;color:#64748b;line-height:1.6;">Clear browser cookies or try a different browser. Your cart is saved.</p>
           </td>
-        </tr>
-        <tr><td colspan="2" style="padding-top:14px;">
-          <p style="margin:0;font-size:12px;color:#64748b;text-align:center;">Still stuck? Reply to this email — we'll help complete your order manually.</p>
-        </td></tr></table>
+        </tr></table>
       </td>
     </tr></table>
-  </td></tr>
+  </td></tr>` : ''}
 
   <tr><td style="padding:0 40px 36px;">
     <table width="100%" cellpadding="0" cellspacing="0"><tr>
       <td style="padding:14px 18px;background:#fff7ed;border-radius:10px;border:1px solid #fed7aa;text-align:center;">
-        <p style="margin:0;font-size:13px;color:#c2410c;line-height:1.5;">⏰ <strong>Your cart &amp; discount code expire in 24 hours.</strong> Complete checkout now before items sell out.</p>
+        <p style="margin:0;font-size:13px;color:#c2410c;line-height:1.5;">⏰ <strong>${step >= 3 ? 'This is your FINAL reminder. Your cart expires today.' : 'Your cart &amp; discount code expire in 24 hours.'}</strong>${step < 3 ? ' Complete checkout now before items sell out.' : ''}</p>
       </td>
     </tr></table>
   </td></tr>
 
   <tr><td style="padding:24px 40px;background:#f8fafc;border-top:1px solid #e2e8f0;text-align:center;">
-    <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.7;">You received this because you added items to your cart at <a href="${storeUrl}" style="color:#0d9488;text-decoration:none;">${storeName}</a>. We never share your information.</p>
+    <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.7;">You received this because you added items to your cart at <a href="${storeUrl}" style="color:#0d9488;text-decoration:none;">${storeName}</a>.</p>
     <p style="margin:8px 0 0;font-size:11px;color:#cbd5e1;"><a href="${process.env.FRONTEND_URL || ''}/unsubscribe" style="color:#94a3b8;text-decoration:underline;">Unsubscribe</a> &nbsp;·&nbsp; ${storeUrl}</p>
   </td></tr>
 
@@ -178,7 +185,6 @@ function buildEmailHtml(params: {
 </html>`;
 }
 
-// ── Build transporter from store settings ─────────────────────────────────────
 function buildTransporter(store: any) {
   return nodemailer.createTransport({
     host:   store.owner?.smtpHost || store.smtpHost || process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -192,45 +198,97 @@ function buildTransporter(store: any) {
   });
 }
 
+// ── Step helpers ─────────────────────────────────────────────────────────────
+function alreadySentForStep(order: any, step: number): boolean {
+  if (step === 1) return !!order.emailSentAt;
+  if (step === 2) return !!order.emailStep2SentAt;
+  if (step === 3) return !!order.emailStep3SentAt;
+  return false;
+}
+
+function getSentAtField(step: number): string {
+  if (step === 1) return 'emailSentAt';
+  if (step === 2) return 'emailStep2SentAt';
+  return 'emailStep3SentAt';
+}
+
+function getTemplateForStep(campaign: any, step: number, abVariant: string): { template: string | null; subject: string | null } {
+  if (step === 2) return { template: campaign?.emailStep2Template || null, subject: campaign?.emailStep2Subject || null };
+  if (step === 3) return { template: campaign?.emailStep3Template || null, subject: campaign?.emailStep3Subject || null };
+  // Step 1 with A/B
+  if (step === 1 && abVariant === 'B' && campaign?.abTestEnabled) {
+    return { template: campaign?.abVariantBTemplate || campaign?.emailTemplate || null, subject: campaign?.abVariantBSubject || null };
+  }
+  return { template: campaign?.emailTemplate || null, subject: null };
+}
+
 // ── Worker ────────────────────────────────────────────────────────────────────
 const worker = new Worker(
   'recovery-email',
   async (job) => {
-    const { orderId } = job.data;
-    console.log('📧 Processing recovery email for order:', orderId);
+    const { orderId, step = 1 } = job.data;
+    console.log(`📧 Processing email step ${step} for order:`, orderId);
 
     const order = await prisma.abandonedOrder.findUnique({
       where: { id: orderId },
       include: {
-        store: {
-          include: { owner: true, campaigns: { take: 1 } },
-        },
+        store: { include: { owner: true, campaigns: { take: 1 } } },
       },
     });
 
     if (!order) throw new Error(`Order ${orderId} not found`);
     if (!order.customerEmail) throw new Error(`Order ${orderId} has no customer email`);
-    if (order.emailSentAt) { console.log(`📧 Already sent for ${orderId}, skipping`); return; }
+
+    // Skip if already recovered
+    if (order.status === 'RECOVERED') {
+      console.log(`⏭ Order ${orderId} already recovered, skipping step ${step}`);
+      return;
+    }
+
+    // Skip if this step was already sent
+    if (alreadySentForStep(order, step)) {
+      console.log(`⏭ Step ${step} already sent for ${orderId}, skipping`);
+      return;
+    }
 
     const campaign = order.store.campaigns?.[0];
+
+    // A/B variant assignment (only on step 1)
+    let abVariant = order.abVariant || 'A';
+    if (step === 1 && campaign?.abTestEnabled && !order.abVariant) {
+      abVariant = Math.random() < 0.5 ? 'A' : 'B';
+      await prisma.abandonedOrder.update({ where: { id: orderId }, data: { abVariant } });
+    }
+
     const cartItems = Array.isArray(order.cartSnapshot) ? order.cartSnapshot as any[] : [];
     const cartValue = Number(order.cartValue || 0);
     const storeUrl = `https://${order.store.domain}`;
-    const recoveryLink = `${storeUrl}/cart?recover=${order.sessionId || order.externalOrderId}`;
+    const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL?.replace(':3000', ':3001') || 'http://localhost:3001';
+    const clickTrackUrl = `${apiUrl}/track/click/${order.id}?url=${encodeURIComponent(`${storeUrl}/cart?recover=${order.sessionId || order.externalOrderId}`)}`;
+    const openPixelUrl = `${apiUrl}/track/open/${order.id}.png`;
+
+    const { template, subject: customSubject } = getTemplateForStep(campaign, step, abVariant);
 
     const html = buildEmailHtml({
-      template:     campaign?.emailTemplate || null,
+      template,
       customerName: order.customerName,
       storeName:    order.store.name,
       storeUrl,
       cartValue,
       cartItems,
-      recoveryLink,
-    });
+      recoveryLink: clickTrackUrl,
+      step,
+    }) + `<img src="${openPixelUrl}" width="1" height="1" style="display:none" alt="">`;
 
-    const offer = getSmartOffer(cartValue);
+    const offer = getSmartOffer(cartValue, step);
     const firstName = order.customerName?.split(' ')[0] || 'there';
-    const subject = `${firstName}, your cart is waiting — ${offer.badgeLabel} inside 🛒`;
+
+    const defaultSubjects: Record<number, string> = {
+      1: `${firstName}, your cart is waiting — ${offer.badgeLabel} inside 🛒`,
+      2: `${firstName}, still thinking? ${offer.badgeLabel} just for you ⏰`,
+      3: `Last chance ${firstName} — your cart expires today 🚨`,
+    };
+    const subject = customSubject || defaultSubjects[step] || defaultSubjects[1];
 
     const transporter = buildTransporter(order.store);
     const fromAddr = order.store.owner?.smtpFrom || order.store.owner?.smtpUser ||
@@ -246,10 +304,10 @@ const worker = new Worker(
 
     await prisma.abandonedOrder.update({
       where: { id: orderId },
-      data: { emailSentAt: new Date(), status: 'DETECTED' },
+      data: { [getSentAtField(step)]: new Date(), status: 'DETECTED' },
     });
 
-    console.log('📧 Recovery email sent:', info.messageId, '→', order.customerEmail);
+    console.log(`📧 Email step ${step} sent (variant ${abVariant}):`, info.messageId, '→', order.customerEmail);
   },
   { connection: redisConnection, concurrency: 3 },
 );

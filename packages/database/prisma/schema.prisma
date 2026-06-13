@@ -147,6 +147,21 @@ model AbandonedOrder {
   recoveredAt  DateTime?
   emailSentAt  DateTime?
 
+  // Multi-step sequence tracking
+  emailStep2SentAt DateTime?
+  emailStep3SentAt DateTime?
+  whatsappSentAt   DateTime?
+  smsSentAt        DateTime?
+
+  // A/B testing
+  abVariant String? // 'A' | 'B'
+
+  // Analytics tracking
+  emailOpenedAt   DateTime?
+  emailClickedAt  DateTime?
+  recoveredBy     String?   // 'EMAIL' | 'WHATSAPP' | 'SMS'
+  recoveredByStep Int?      // 1, 2, or 3
+
   storeId String
   store   Store  @relation(fields: [storeId], references: [id])
 
@@ -171,6 +186,21 @@ model Campaign {
   emailTemplate    String?
   whatsappTemplate String?
   smsTemplate      String?
+
+  // Email sequence step 2 (e.g. 24h follow-up)
+  emailStep2DelayMin Int?
+  emailStep2Subject  String?
+  emailStep2Template String?
+
+  // Email sequence step 3 (e.g. 72h follow-up)
+  emailStep3DelayMin Int?
+  emailStep3Subject  String?
+  emailStep3Template String?
+
+  // A/B testing on step 1
+  abTestEnabled     Boolean @default(false)
+  abVariantBSubject String?
+  abVariantBTemplate String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

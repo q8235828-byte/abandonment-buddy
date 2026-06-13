@@ -13,7 +13,6 @@ export class AbandonmentService {
     private queueService: QueueService,
   ) {}
 
-  // Runs every 10 minutes automatically
   @Cron(CronExpression.EVERY_10_MINUTES)
   async checkAbandonedOrdersCron() {
     return this.checkAbandonedOrders();
@@ -28,7 +27,7 @@ export class AbandonmentService {
         customerEmail: { not: null },
         ...(userId ? { store: { ownerId: userId } } : {}),
       },
-      include: { store: true },
+      include: { store: { include: { campaigns: { take: 1 } } } },
     });
 
     const now = new Date();
@@ -36,23 +35,43 @@ export class AbandonmentService {
 
     for (const order of orders) {
       const timeoutMs = (order.store.abandonmentTimeoutMin || 180) * 60 * 1000;
-      const lastActivity = new Date(order.updatedAt);
-      const elapsed = now.getTime() - lastActivity.getTime();
+      const elapsed   = now.getTime() - new Date(order.updatedAt).getTime();
 
-      if (elapsed >= timeoutMs) {
-        const updated = await this.prisma.abandonedOrder.update({
-          where: { id: order.id },
-          data: {
-            isAbandoned: true,
-            abandonedAt: new Date(),
-            status: 'DETECTED',
-          },
-        });
+      if (elapsed < timeoutMs) continue;
 
-        await this.queueService.addRecoveryEmailJob(updated.id);
-        queued.push(updated.id);
-        this.logger.log(`Cart abandoned → queued email: ${order.id} (${order.customerEmail})`);
+      const updated = await this.prisma.abandonedOrder.update({
+        where: { id: order.id },
+        data:  { isAbandoned: true, abandonedAt: new Date(), status: 'DETECTED' },
+      });
+
+      const campaign = order.store.campaigns?.[0];
+      const ms = (min: number) => min * 60 * 1000;
+
+      // ── Email sequence ─────────────────────────────────────────────────────
+      if (!campaign || campaign.emailEnabled) {
+        const step1Delay = ms(campaign?.emailDelayMin ?? 30);
+        await this.queueService.addRecoveryEmailJob(updated.id, 1, step1Delay);
+
+        if (campaign?.emailStep2DelayMin) {
+          await this.queueService.addRecoveryEmailJob(updated.id, 2, ms(campaign.emailStep2DelayMin));
+        }
+        if (campaign?.emailStep3DelayMin) {
+          await this.queueService.addRecoveryEmailJob(updated.id, 3, ms(campaign.emailStep3DelayMin));
+        }
       }
+
+      // ── WhatsApp ───────────────────────────────────────────────────────────
+      if (campaign?.whatsappEnabled && order.customerPhone) {
+        await this.queueService.addWhatsAppJob(updated.id, ms(campaign.whatsappDelayMin ?? 60));
+      }
+
+      // ── SMS ────────────────────────────────────────────────────────────────
+      if (campaign?.smsEnabled && order.customerPhone) {
+        await this.queueService.addSmsJob(updated.id, ms(campaign.smsDelayMin ?? 120));
+      }
+
+      queued.push(updated.id);
+      this.logger.log(`Cart abandoned → queued recovery jobs: ${order.id} (${order.customerEmail})`);
     }
 
     this.logger.log(`Abandonment check: ${orders.length} active carts, ${queued.length} newly abandoned`);
@@ -61,7 +80,7 @@ export class AbandonmentService {
 
   async getOrders(userId: string) {
     return this.prisma.abandonedOrder.findMany({
-      where: { store: { ownerId: userId } },
+      where:   { store: { ownerId: userId } },
       orderBy: { createdAt: 'desc' },
       include: { store: true },
     });

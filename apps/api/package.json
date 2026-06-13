@@ -30,6 +30,7 @@
     "@nestjs/swagger": "^11.4.4",
     "@prisma/client": "^6.8.2",
     "@types/passport-google-oauth20": "^2.0.17",
+    "@types/twilio": "^3.19.3",
     "axios": "^1.9.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.77.6",
@@ -45,6 +46,7 @@
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
+    "twilio": "^6.0.2",
     "uuid": "^14.0.0"
   },
   "devDependencies": {
