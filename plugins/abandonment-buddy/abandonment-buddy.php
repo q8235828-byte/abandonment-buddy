@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.6
+ * Version:     1.4.7
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -16,12 +16,15 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-// Tell WordPress to use direct file access for updates (avoids FTP credentials prompt).
+// Force direct filesystem access so WordPress can install updates without
+// prompting for FTP credentials. Both the constant and the filter are set
+// so it works regardless of which mechanism WordPress checks first.
 if ( ! defined( 'FS_METHOD' ) ) {
     define( 'FS_METHOD', 'direct' );
 }
+add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.4.6' );
+define( 'AB_VERSION',    '1.4.7' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
