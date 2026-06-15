@@ -1,5 +1,6 @@
-import { Controller, Get, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import { Controller, Get, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { ZipArchive } from 'archiver';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -26,22 +27,20 @@ function readChangelog(): string {
 @Controller('plugin')
 export class PluginController {
 
-  // The zip is committed to the repo — serve directly from GitHub raw CDN.
-  // No Vercel URL or WEB_URL env var needed.
-  private static readonly ZIP_URL =
-    'https://raw.githubusercontent.com/q8235828-byte/abandonment-buddy/main/apps/web/public/abandonment-buddy.zip';
+  private baseUrl(req: Request): string {
+    if (process.env.API_URL) return process.env.API_URL.replace(/\/$/, '');
+    const proto = (req.headers['x-forwarded-proto'] as string) ?? req.protocol;
+    return `${proto}://${req.get('host')}`;
+  }
 
   @Get('info')
-  getInfo() {
-    const version   = readPluginVersion();
-    const changelog = readChangelog();
-
+  getInfo(@Req() req: Request) {
     return {
       name:          'Abandonment Buddy for WooCommerce',
       slug:          'abandonment-buddy',
-      version,
-      download_url:  PluginController.ZIP_URL,
-      changelog,
+      version:       readPluginVersion(),
+      download_url:  `${this.baseUrl(req)}/plugin/download`,
+      changelog:     readChangelog(),
       requires:      '5.8',
       requires_php:  '7.0',
       tested_up_to:  '6.7',
@@ -53,6 +52,24 @@ export class PluginController {
 
   @Get('download')
   download(@Res() res: Response) {
-    res.redirect(302, PluginController.ZIP_URL);
+    if (!fs.existsSync(PLUGIN_DIR)) {
+      res.status(404).json({ error: 'Plugin source not found on server' });
+      return;
+    }
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="abandonment-buddy.zip"');
+
+    const archive = new ZipArchive({ zlib: { level: 9 } });
+
+    archive.on('error', (err: Error) => {
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message });
+      }
+    });
+
+    archive.pipe(res);
+    archive.directory(PLUGIN_DIR, 'abandonment-buddy');
+    void archive.finalize();
   }
 }
