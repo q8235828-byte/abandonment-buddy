@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.1.0
+ * Version:     1.2.0
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'AB_VERSION',    '1.1.0' );
+define( 'AB_VERSION',    '1.2.0' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -721,8 +721,141 @@ class Abandonment_Buddy {
     }
 }
 
+// ── Auto-updater ─────────────────────────────────────────────────────────────
+// Hooks into WordPress's native update mechanism so "Update available" appears
+// in WP Admin whenever a new version is pushed to the Abandonment Buddy API.
+
+class AB_Updater {
+
+    private string $slug;        // abandonment-buddy/abandonment-buddy.php
+    private string $folder;      // abandonment-buddy
+    private string $version;     // currently installed version
+    private string $update_url;  // API base URL for version checks
+
+    public function __construct( string $slug, string $version, string $update_url ) {
+        $this->slug       = $slug;
+        $this->folder     = dirname( $slug );
+        $this->version    = $version;
+        $this->update_url = rtrim( $update_url, '/' );
+
+        add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'inject_update' ] );
+        add_filter( 'plugins_api',                           [ $this, 'plugin_info' ], 10, 3 );
+        add_filter( 'upgrader_source_selection',             [ $this, 'fix_folder' ], 10, 4 );
+    }
+
+    /** Called by WordPress during its update check — inject our version if newer. */
+    public function inject_update( $transient ) {
+        if ( empty( $transient->checked ) ) {
+            return $transient;
+        }
+
+        $remote = $this->fetch_remote();
+        if ( ! $remote || ! version_compare( $remote->version, $this->version, '>' ) ) {
+            return $transient;
+        }
+
+        $transient->response[ $this->slug ] = (object) [
+            'id'          => $this->slug,
+            'slug'        => $this->folder,
+            'plugin'      => $this->slug,
+            'new_version' => $remote->version,
+            'url'         => $remote->homepage ?? 'https://abandonmentbuddy.com',
+            'package'     => $remote->download_url,
+            'icons'       => [],
+            'banners'     => [],
+            'requires'    => $remote->requires     ?? '5.8',
+            'tested'      => $remote->tested_up_to ?? '6.7',
+            'requires_php'=> $remote->requires_php ?? '7.4',
+        ];
+
+        return $transient;
+    }
+
+    /** Provides plugin details for the "View version X.X details" lightbox. */
+    public function plugin_info( $result, $action, $args ) {
+        if ( 'plugin_information' !== $action || $args->slug !== $this->folder ) {
+            return $result;
+        }
+
+        $remote = $this->fetch_remote();
+        if ( ! $remote ) {
+            return $result;
+        }
+
+        return (object) [
+            'name'          => $remote->name          ?? 'Abandonment Buddy for WooCommerce',
+            'slug'          => $this->folder,
+            'version'       => $remote->version,
+            'author'        => $remote->author        ?? 'Abandonment Buddy',
+            'homepage'      => $remote->homepage      ?? 'https://abandonmentbuddy.com',
+            'download_link' => $remote->download_url,
+            'last_updated'  => $remote->last_updated  ?? '',
+            'requires'      => $remote->requires      ?? '5.8',
+            'requires_php'  => $remote->requires_php  ?? '7.4',
+            'tested'        => $remote->tested_up_to  ?? '6.7',
+            'sections'      => [
+                'description' => 'Automatically track and recover abandoned WooCommerce carts via email, WhatsApp, and SMS.',
+                'changelog'   => nl2br( $remote->changelog ?? '' ),
+            ],
+        ];
+    }
+
+    /**
+     * WordPress unzips plugin archives into a temp folder that may have a
+     * different name.  This filter renames it to `abandonment-buddy/` so
+     * the upgrade replaces the correct directory.
+     */
+    public function fix_folder( $source, $remote_source, $upgrader, $hook_extra ) {
+        global $wp_filesystem;
+
+        if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->slug ) {
+            return $source;
+        }
+
+        $target = trailingslashit( $remote_source ) . $this->folder . '/';
+        if ( $source !== $target && $wp_filesystem->is_dir( $source ) ) {
+            $wp_filesystem->move( $source, $target );
+            return $target;
+        }
+
+        return $source;
+    }
+
+    /** Fetch remote version info from the API (cached per request). */
+    private function fetch_remote(): ?object {
+        static $cache = null;
+        if ( $cache !== null ) {
+            return $cache === false ? null : $cache;
+        }
+
+        $url = $this->update_url . '/plugin/info';
+
+        $response = wp_remote_get( $url, [
+            'timeout'    => 8,
+            'user-agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . get_bloginfo( 'url' ),
+        ] );
+
+        if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+            $cache = false;
+            return null;
+        }
+
+        $body = json_decode( wp_remote_retrieve_body( $response ) );
+        $cache = ( $body && ! empty( $body->version ) ) ? $body : false;
+        return $cache === false ? null : $cache;
+    }
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 add_action( 'plugins_loaded', function () {
-    Abandonment_Buddy::get_instance();
+    $instance = Abandonment_Buddy::get_instance();
+
+    // Boot auto-updater using the stored API URL (falls back to official URL).
+    $settings   = (array) get_option( AB_OPTION_KEY, [] );
+    $update_url = ! empty( $settings['api_url'] )
+        ? $settings['api_url']
+        : 'https://api.abandonmentbuddy.com';
+
+    new AB_Updater( plugin_basename( __FILE__ ), AB_VERSION, $update_url );
 } );

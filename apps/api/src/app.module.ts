@@ -22,6 +22,7 @@ import { CampaignsModule } from './campaigns/campaigns.module';
 import { BillingModule } from './billing/billing.module';
 import { AdminModule } from './admin/admin.module';
 import { TrackingModule } from './tracking/tracking.module';
+import { PluginModule } from './plugin/plugin.module';
 
 
 @Module({
@@ -42,6 +43,7 @@ import { TrackingModule } from './tracking/tracking.module';
     BillingModule,
     AdminModule,
     TrackingModule,
+    PluginModule,
   ],
   controllers: [AppController],
   providers: [AppService],
