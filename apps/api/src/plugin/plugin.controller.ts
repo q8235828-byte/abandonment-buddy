@@ -2,10 +2,12 @@ import { Controller, Get, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import archiver = require('archiver');
 
-// Resolve paths relative to this file's compiled location:
-// dist/plugin/ → ../../../../plugins/abandonment-buddy
+// @types/archiver@8 changed its export shape in a way that breaks nodenext
+// resolution — typing it as any is the reliable workaround.
+// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
+const createArchive: (format: string, options?: object) => any = require('archiver');
+
 const PLUGIN_DIR  = path.resolve(__dirname, '../../../../plugins/abandonment-buddy');
 const PLUGIN_FILE = path.join(PLUGIN_DIR, 'abandonment-buddy.php');
 const README_FILE = path.join(PLUGIN_DIR, 'readme.txt');
@@ -31,22 +33,22 @@ export class PluginController {
 
   @Get('info')
   getInfo() {
-    const version  = readPluginVersion();
+    const version   = readPluginVersion();
     const changelog = readChangelog();
-    const apiUrl   = process.env.API_URL || 'http://localhost:3001';
+    const apiUrl    = process.env.API_URL || 'http://localhost:3001';
 
     return {
-      name:           'Abandonment Buddy for WooCommerce',
-      slug:           'abandonment-buddy',
+      name:          'Abandonment Buddy for WooCommerce',
+      slug:          'abandonment-buddy',
       version,
-      download_url:   `${apiUrl}/plugin/download`,
+      download_url:  `${apiUrl}/plugin/download`,
       changelog,
-      requires:       '5.8',
-      requires_php:   '7.4',
-      tested_up_to:   '6.7',
-      last_updated:   new Date().toISOString().slice(0, 10),
-      author:         'Abandonment Buddy',
-      homepage:       'https://abandonmentbuddy.com',
+      requires:      '5.8',
+      requires_php:  '7.4',
+      tested_up_to:  '6.7',
+      last_updated:  new Date().toISOString().slice(0, 10),
+      author:        'Abandonment Buddy',
+      homepage:      'https://abandonmentbuddy.com',
     };
   }
 
@@ -57,7 +59,7 @@ export class PluginController {
       return;
     }
 
-    const version = readPluginVersion();
+    const version  = readPluginVersion();
     const filename = `abandonment-buddy-${version}.zip`;
 
     res.set({
@@ -66,8 +68,8 @@ export class PluginController {
       'Cache-Control':       'no-cache',
     });
 
-    const archive = archiver('zip', { zlib: { level: 6 } });
-    archive.on('error', (err) => {
+    const archive = createArchive('zip', { zlib: { level: 6 } });
+    archive.on('error', (err: Error) => {
       if (!res.headersSent) res.status(500).json({ message: err.message });
     });
 
