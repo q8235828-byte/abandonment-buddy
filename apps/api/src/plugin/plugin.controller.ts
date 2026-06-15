@@ -3,11 +3,6 @@ import type { Response } from 'express';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-// @types/archiver@8 changed its export shape in a way that breaks nodenext
-// resolution — typing it as any is the reliable workaround.
-// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-explicit-any
-const createArchive: (format: string, options?: object) => any = require('archiver');
-
 const PLUGIN_DIR  = path.resolve(__dirname, '../../../../plugins/abandonment-buddy');
 const PLUGIN_FILE = path.join(PLUGIN_DIR, 'abandonment-buddy.php');
 const README_FILE = path.join(PLUGIN_DIR, 'readme.txt');
@@ -33,15 +28,18 @@ export class PluginController {
 
   @Get('info')
   getInfo() {
-    const version   = readPluginVersion();
-    const changelog = readChangelog();
-    const apiUrl    = process.env.API_URL || 'http://localhost:3001';
+    const version     = readPluginVersion();
+    const changelog   = readChangelog();
+    // Plugin zip is served as a static file from the Vercel frontend.
+    // WEB_URL should be set to the Vercel deployment URL (no trailing slash).
+    const webUrl      = (process.env.WEB_URL || 'https://abandonment-buddy.vercel.app').replace(/\/$/, '');
+    const downloadUrl = `${webUrl}/abandonment-buddy.zip`;
 
     return {
       name:          'Abandonment Buddy for WooCommerce',
       slug:          'abandonment-buddy',
       version,
-      download_url:  `${apiUrl}/plugin/download`,
+      download_url:  downloadUrl,
       changelog,
       requires:      '5.8',
       requires_php:  '7.4',
@@ -53,28 +51,9 @@ export class PluginController {
   }
 
   @Get('download')
-  async download(@Res() res: Response) {
-    if (!fs.existsSync(PLUGIN_DIR)) {
-      res.status(404).json({ message: 'Plugin source not found' });
-      return;
-    }
-
-    const version  = readPluginVersion();
-    const filename = `abandonment-buddy-${version}.zip`;
-
-    res.set({
-      'Content-Type':        'application/zip',
-      'Content-Disposition': `attachment; filename="${filename}"`,
-      'Cache-Control':       'no-cache',
-    });
-
-    const archive = createArchive('zip', { zlib: { level: 6 } });
-    archive.on('error', (err: Error) => {
-      if (!res.headersSent) res.status(500).json({ message: err.message });
-    });
-
-    archive.pipe(res);
-    archive.directory(PLUGIN_DIR, 'abandonment-buddy');
-    await archive.finalize();
+  download(@Res() res: Response) {
+    // Redirect to the static file served by Vercel — no file system access needed.
+    const webUrl = (process.env.WEB_URL || 'https://abandonment-buddy.vercel.app').replace(/\/$/, '');
+    res.redirect(302, `${webUrl}/abandonment-buddy.zip`);
   }
 }
