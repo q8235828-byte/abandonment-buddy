@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Loader2,
   Mail,
+  Package,
   PlugZap,
   RotateCw,
   Send,
@@ -124,6 +125,7 @@ export default function StoreDetailsPage() {
   const [connecting, setConnecting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [pluginVersion, setPluginVersion] = useState('');
 
   // Email settings
   const [emailProvider, setEmailProvider] = useState('gmail');
@@ -162,7 +164,13 @@ export default function StoreDetailsPage() {
     }
   };
 
-  useEffect(() => { void fetchStores(); }, []);
+  useEffect(() => {
+    void fetchStores();
+    fetch(`${API_BASE_URL}/plugin/info`)
+      .then((r) => r.json())
+      .then((d: { version?: string }) => { if (d.version) setPluginVersion(d.version); })
+      .catch(() => {});
+  }, []);
 
   // Pre-fill email fields when store data loads
   useEffect(() => {
@@ -288,18 +296,18 @@ export default function StoreDetailsPage() {
 
                 <Step number={2} title="Download & install the plugin" done={isConnected}>
                   <p className="mb-3">
-                    Download the WooCommerce plugin, then install it via{' '}
+                    Download the WooCommerce plugin and install it via{' '}
                     <strong>WordPress Admin → Plugins → Add New → Upload Plugin</strong>.
                   </p>
                   <a
-                    href="/api/download-plugin"
+                    href={`${API_BASE_URL}/plugin/download`}
                     download="abandonment-buddy.zip"
                     className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
                   >
-                    <Download size={15} /> Download abandonment-buddy.zip
+                    <Download size={15} /> Download Plugin{pluginVersion ? ` v${pluginVersion}` : ''}
                   </a>
                   <p className="mt-2 text-xs text-slate-400">
-                    Install via <strong>WordPress Admin → Plugins → Add New → Upload Plugin</strong>
+                    The plugin includes auto-update support — future updates appear directly in WP Admin.
                   </p>
                 </Step>
 
@@ -428,6 +436,78 @@ export default function StoreDetailsPage() {
               </a>
             </div>
 
+          </div>
+
+          {/* ── Plugin management ── */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-50">
+                <Package size={17} className="text-violet-600" />
+              </span>
+              <div>
+                <h2 className="font-semibold text-slate-900">WordPress Plugin</h2>
+                <p className="text-xs text-slate-400">Manage plugin installation and updates for this store</p>
+              </div>
+              {pluginVersion && (
+                <span className="ml-auto rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                  Latest: v{pluginVersion}
+                </span>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              {/* Download card */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p className="mb-1 text-sm font-semibold text-slate-900">Download plugin</p>
+                <p className="mb-4 text-xs text-slate-500">
+                  Download the latest version of the Abandonment Buddy WooCommerce plugin.
+                  The plugin checks for updates automatically once installed.
+                </p>
+                <a
+                  href={`${API_BASE_URL}/plugin/download`}
+                  download="abandonment-buddy.zip"
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                >
+                  <Download size={15} /> Download{pluginVersion ? ` v${pluginVersion}` : ' Plugin'}
+                </a>
+              </div>
+
+              {/* Install steps */}
+              <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-900">Installation steps</p>
+                <ol className="space-y-2 text-xs text-slate-600">
+                  <li className="flex gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">1</span>
+                    Download the zip file above
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">2</span>
+                    Go to <strong>WP Admin → Plugins → Add New → Upload Plugin</strong>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">3</span>
+                    Select the zip and click <strong>Install Now</strong>, then <strong>Activate</strong>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">4</span>
+                    Open <strong>WooCommerce → Abandonment Buddy</strong> and paste your credentials
+                  </li>
+                </ol>
+              </div>
+            </div>
+
+            {/* Auto-update notice */}
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-violet-100 bg-violet-50 p-4">
+              <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-violet-500" />
+              <div>
+                <p className="text-sm font-semibold text-violet-900">Auto-updates enabled</p>
+                <p className="mt-0.5 text-xs text-violet-700">
+                  Once the plugin is installed and connected, future updates appear directly in{' '}
+                  <strong>WP Admin → Dashboard → Updates</strong> — just like any other WordPress plugin.
+                  No manual zip uploads needed.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* ── Email settings ── */}

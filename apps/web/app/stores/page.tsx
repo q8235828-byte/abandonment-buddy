@@ -5,20 +5,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, Download, Layers, Plus, Search, Store as StoreIcon, XCircle } from 'lucide-react';
 import { AppShell } from '../components/AppShell';
 import { Alert, EmptyState, LoadingRow, StatCard, StatusBadge } from '../components/Ui';
-import { api, getApiErrorMessage } from '../lib/api';
+import { API_BASE_URL, api, getApiErrorMessage } from '../lib/api';
 import type { Store } from '../lib/types';
 
 const inputCls = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-teal-500/20 transition';
 
 export default function StoresPage() {
-  const [stores, setStores]   = useState<Store[]>([]);
-  const [name, setName]       = useState('');
-  const [domain, setDomain]   = useState('');
-  const [query, setQuery]     = useState('');
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState('');
-  const [message, setMessage] = useState('');
+  const [stores, setStores]         = useState<Store[]>([]);
+  const [name, setName]             = useState('');
+  const [domain, setDomain]         = useState('');
+  const [query, setQuery]           = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState('');
+  const [message, setMessage]       = useState('');
+  const [pluginVersion, setPluginVersion] = useState('');
 
   const fetchStores = async () => {
     try {
@@ -33,7 +34,13 @@ export default function StoresPage() {
     }
   };
 
-  useEffect(() => { void fetchStores(); }, []);
+  useEffect(() => {
+    void fetchStores();
+    fetch(`${API_BASE_URL}/plugin/info`)
+      .then((r) => r.json())
+      .then((d: { version?: string }) => { if (d.version) setPluginVersion(d.version); })
+      .catch(() => {});
+  }, []);
 
   const createStore = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,22 +80,29 @@ export default function StoresPage() {
 
         {/* Plugin download banner */}
         <section className="rounded-2xl border border-teal-200 bg-teal-50 p-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500 text-white">
                 <Download size={18} />
               </div>
               <div>
-                <p className="font-semibold text-slate-900">WordPress Plugin</p>
-                <p className="text-xs text-slate-500">Download, install in WordPress, then connect using your store credentials below.</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-slate-900">WordPress Plugin</p>
+                  {pluginVersion && (
+                    <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-semibold text-teal-700">
+                      v{pluginVersion}
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">Download, install in WordPress, then connect using your store credentials. Auto-updates included.</p>
               </div>
             </div>
             <a
-              href="/api/download-plugin"
+              href={`${API_BASE_URL}/plugin/download`}
               download="abandonment-buddy.zip"
               className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
             >
-              <Download size={15} /> Download Plugin v1.1.0
+              <Download size={15} /> Download Plugin{pluginVersion ? ` v${pluginVersion}` : ''}
             </a>
           </div>
         </section>
