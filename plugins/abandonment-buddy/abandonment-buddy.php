@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.3
+ * Version:     1.4.4
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'AB_VERSION',    '1.4.3' );
+define( 'AB_VERSION',    '1.4.4' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -38,6 +38,8 @@ register_activation_hook( __FILE__, function () {
     if ( ! wp_next_scheduled( AB_CRON_HOOK ) ) {
         wp_schedule_event( time(), 'ab_every_5_min', AB_CRON_HOOK );
     }
+    // Force WordPress to re-check for plugin updates on next load.
+    delete_site_transient( 'update_plugins' );
 } );
 
 register_deactivation_hook( __FILE__, function () {
@@ -197,9 +199,10 @@ class Abandonment_Buddy {
     }
 
     private function init() {
-        add_action( 'admin_menu',            [ $this, 'add_admin_page' ] );
-        add_action( 'admin_post_ab_save',    [ $this, 'handle_save' ] );
-        add_action( 'admin_post_ab_connect', [ $this, 'handle_connect' ] );
+        add_action( 'admin_menu',                   [ $this, 'add_admin_page' ] );
+        add_action( 'admin_post_ab_save',           [ $this, 'handle_save' ] );
+        add_action( 'admin_post_ab_connect',        [ $this, 'handle_connect' ] );
+        add_action( 'admin_post_ab_check_updates',  [ $this, 'handle_check_updates' ] );
 
         if ( empty( $this->settings['store_id'] ) || empty( $this->settings['webhook_secret'] ) ) {
             return;
@@ -478,6 +481,17 @@ class Abandonment_Buddy {
         );
     }
 
+    public function handle_check_updates() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Unauthorized' );
+        }
+        check_admin_referer( 'ab_check_updates' );
+        delete_site_transient( 'update_plugins' );
+        wp_update_plugins();
+        wp_redirect( admin_url( 'update-core.php' ) );
+        exit;
+    }
+
     public function handle_save() {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'Unauthorized' );
@@ -491,6 +505,7 @@ class Abandonment_Buddy {
         $settings['api_secret'] = sanitize_text_field( trim( $_POST['api_secret'] ?? '' ) );
 
         update_option( AB_OPTION_KEY, $settings );
+        delete_site_transient( 'update_plugins' );
         wp_redirect( admin_url( 'admin.php?page=abandonment-buddy&saved=1' ) );
         exit;
     }
@@ -651,6 +666,15 @@ class Abandonment_Buddy {
                             🔌 Save &amp; Connect to Abandonment Buddy
                         </button>
                         <p style="margin:6px 0 0;color:#94a3b8;font-size:12px;text-align:center;">Verifies credentials and activates live cart tracking</p>
+                    </form>
+
+                    <!-- Check for updates -->
+                    <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:10px;">
+                        <?php wp_nonce_field( 'ab_check_updates' ); ?>
+                        <input type="hidden" name="action" value="ab_check_updates">
+                        <button type="submit" style="width:100%;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:8px 0;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">
+                            🔄 Check for plugin updates
+                        </button>
                     </form>
                 </div>
 
