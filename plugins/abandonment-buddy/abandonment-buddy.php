@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.1
+ * Version:     1.4.2
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'AB_VERSION',    '1.4.1' );
+define( 'AB_VERSION',    '1.4.2' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -51,12 +51,12 @@ register_deactivation_hook( __FILE__, function () {
 
 class AB_DB {
 
-    public static function table(): string {
+    public static function table() {
         global $wpdb;
         return $wpdb->prefix . 'ab_carts';
     }
 
-    public static function create_table(): void {
+    public static function create_table() {
         global $wpdb;
         $table      = self::table();
         $charset_collate = $wpdb->get_charset_collate();
@@ -84,7 +84,7 @@ class AB_DB {
         update_option( 'ab_db_version', AB_DB_VERSION );
     }
 
-    public static function upsert( array $data ): void {
+    public static function upsert( $data ) {
         global $wpdb;
         $table = self::table();
 
@@ -122,7 +122,7 @@ class AB_DB {
         }
     }
 
-    public static function mark_recovered( string $session_id ): void {
+    public static function mark_recovered( $session_id ) {
         global $wpdb;
         $wpdb->update(
             self::table(),
@@ -131,7 +131,7 @@ class AB_DB {
         );
     }
 
-    public static function mark_synced( string $session_id ): void {
+    public static function mark_synced( $session_id ) {
         global $wpdb;
         $wpdb->update(
             self::table(),
@@ -140,7 +140,7 @@ class AB_DB {
         );
     }
 
-    public static function get_unsynced( int $limit = 50 ): array {
+    public static function get_unsynced( $limit = 50 ) {
         global $wpdb;
         $table = self::table();
         return $wpdb->get_results(
@@ -158,7 +158,7 @@ class AB_DB {
         );
     }
 
-    public static function get_all_recent( int $limit = 100 ): array {
+    public static function get_all_recent( $limit = 100 ) {
         global $wpdb;
         $table = self::table();
         return $wpdb->get_results(
@@ -230,22 +230,22 @@ class Abandonment_Buddy {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function api_url( string $path ): string {
+    private function api_url( $path ) {
         return rtrim( $this->settings['api_url'] ?? '', '/' ) . $path;
     }
 
-    private function sign( string $body ): string {
+    private function sign( $body ) {
         return hash_hmac( 'sha256', $body, $this->settings['webhook_secret'] ?? '' );
     }
 
-    private function session_key(): string {
+    private function session_key() {
         if ( ! function_exists( 'WC' ) || ! WC()->session ) {
             return '';
         }
         return (string) WC()->session->get_customer_id();
     }
 
-    private function build_cart_data( string $session_id, string $email = '' ): array {
+    private function build_cart_data( $session_id, $email = '' ) {
         $cart  = WC()->cart;
         $items = [];
 
@@ -276,7 +276,7 @@ class Abandonment_Buddy {
         ];
     }
 
-    private function push_to_api( array $payload ): bool {
+    private function push_to_api( $payload ) {
         $store_id = $this->settings['store_id'] ?? '';
         if ( ! $store_id ) {
             return false;
@@ -344,7 +344,7 @@ class Abandonment_Buddy {
         }
     }
 
-    public function on_checkout_review( string $post_data ) {
+    public function on_checkout_review( $post_data ) {
         $session_id = $this->session_key();
         if ( ! $session_id ) {
             return;
@@ -374,7 +374,7 @@ class Abandonment_Buddy {
 
     // ── Order handlers ────────────────────────────────────────────────────────
 
-    public function on_order_created( \\WC_Order $order ) {
+    public function on_order_created( $order ) {
         $session_id = $this->session_key();
         if ( ! $session_id ) {
             return;
@@ -386,7 +386,7 @@ class Abandonment_Buddy {
         $this->send_order_completed( $session_id, $order->get_id(), (float) $order->get_total() );
     }
 
-    public function on_payment_complete( int $order_id ) {
+    public function on_payment_complete( $order_id ) {
         $order = wc_get_order( $order_id );
         if ( ! $order ) {
             return;
@@ -398,7 +398,7 @@ class Abandonment_Buddy {
         }
     }
 
-    private function send_order_completed( string $session_id, int $order_id, float $total ): void {
+    private function send_order_completed( $session_id, $order_id, $total ) {
         $store_id = $this->settings['store_id'] ?? '';
         if ( ! $store_id ) {
             return;
@@ -676,12 +676,14 @@ class Abandonment_Buddy {
                                 </thead>
                                 <tbody>
                                 <?php foreach ( $recent_carts as $cart ) :
-                                    $status_color = match( $cart['status'] ) {
-                                        'recovered' => '#10b981',
-                                        'synced'    => '#3b82f6',
-                                        default     => '#f59e0b',
-                                    };
-                                    $display_name = $cart['email'] ?: substr( $cart['session_id'], 0, 12 ) . '…';
+                                    if ( $cart['status'] === 'recovered' ) {
+                                        $status_color = '#10b981';
+                                    } elseif ( $cart['status'] === 'synced' ) {
+                                        $status_color = '#3b82f6';
+                                    } else {
+                                        $status_color = '#f59e0b';
+                                    }
+                                    $display_name = $cart['email'] ?: substr( $cart['session_id'], 0, 12 ) . '...';
                                 ?>
                                     <tr style="border-bottom:1px solid #f1f5f9;">
                                         <td style="padding:7px 4px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?php echo esc_attr( $cart['email'] ?? '' ); ?>">
