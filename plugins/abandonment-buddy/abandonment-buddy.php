@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.4
+ * Version:     1.4.5
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'AB_VERSION',    '1.4.4' );
+define( 'AB_VERSION',    '1.4.5' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -766,7 +766,6 @@ class AB_Updater {
 
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'inject_update' ] );
         add_filter( 'plugins_api',                           [ $this, 'plugin_info' ], 10, 3 );
-        add_filter( 'upgrader_source_selection',             [ $this, 'fix_folder' ], 10, 4 );
     }
 
     /** Called by WordPress during its update check — inject our version if newer. */
@@ -824,27 +823,6 @@ class AB_Updater {
                 'changelog'   => nl2br( $remote->changelog ?? '' ),
             ],
         ];
-    }
-
-    /**
-     * WordPress unzips plugin archives into a temp folder that may have a
-     * different name.  This filter renames it to `abandonment-buddy/` so
-     * the upgrade replaces the correct directory.
-     */
-    public function fix_folder( $source, $remote_source, $upgrader, $hook_extra ) {
-        global $wp_filesystem;
-
-        if ( ! isset( $hook_extra['plugin'] ) || $hook_extra['plugin'] !== $this->slug ) {
-            return $source;
-        }
-
-        $target = trailingslashit( $remote_source ) . $this->folder . '/';
-        if ( $source !== $target && $wp_filesystem->is_dir( $source ) ) {
-            $wp_filesystem->move( $source, $target );
-            return $target;
-        }
-
-        return $source;
     }
 
     /** Fetch remote version info from the API (cached per request). */
