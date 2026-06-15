@@ -2,8 +2,7 @@ import { Controller, Get, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const archiver = require('archiver') as typeof import('archiver');
+import archiver = require('archiver');
 
 // Resolve paths relative to this file's compiled location:
 // dist/plugin/ → ../../../../plugins/abandonment-buddy
