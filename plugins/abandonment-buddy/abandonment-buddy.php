@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.8
+ * Version:     1.4.9
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.4.8' );
+define( 'AB_VERSION',    '1.4.9' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );

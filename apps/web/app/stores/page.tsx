@@ -98,7 +98,7 @@ export default function StoresPage() {
               </div>
             </div>
             <a
-              href="/abandonment-buddy.zip"
+              href={`${API_BASE_URL}/plugin/download`}
               download="abandonment-buddy.zip"
               className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
             >

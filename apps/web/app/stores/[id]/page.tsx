@@ -300,7 +300,7 @@ export default function StoreDetailsPage() {
                     <strong>WordPress Admin → Plugins → Add New → Upload Plugin</strong>.
                   </p>
                   <a
-                    href="/abandonment-buddy.zip"
+                    href={`${API_BASE_URL}/plugin/download`}
                     download="abandonment-buddy.zip"
                     className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800"
                   >
@@ -464,7 +464,7 @@ export default function StoreDetailsPage() {
                   The plugin checks for updates automatically once installed.
                 </p>
                 <a
-                  href="/abandonment-buddy.zip"
+                  href={`${API_BASE_URL}/plugin/download`}
                   download="abandonment-buddy.zip"
                   className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
                 >
