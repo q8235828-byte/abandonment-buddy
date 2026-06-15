@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.6
+Stable tag: 1.5.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,13 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.7 =
+* Follow-up email sequence: send up to 3 recovery emails per abandoned cart at configurable delays
+* Email 1: fires X minutes after abandonment; Email 2: X minutes after email 1; Email 3: X minutes after email 2
+* Each email has its own delay (minutes) and optional custom promo message
+* Email 2 & 3 disabled by default (set delay > 0 to enable); never re-sends a step already sent
+* DB schema v1.3: adds email_2_sent_at and email_3_sent_at columns
 
 = 1.5.6 =
 * Follow-up email: Settings UI added to Settings tab (enable toggle, delay, subject, from name/email, custom message)

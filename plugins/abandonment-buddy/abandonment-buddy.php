@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.6
+ * Version:     1.5.7
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,10 +24,10 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.6' );
+define( 'AB_VERSION',    '1.5.7' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
-define( 'AB_DB_VERSION', '1.2' );
+define( 'AB_DB_VERSION', '1.3' );
 
 // ── Custom cron interval ─────────────────────────────────────────────────────
 
@@ -91,8 +91,10 @@ class AB_DB {
             cart_total    DECIMAL(10,2)       NOT NULL DEFAULT 0.00,
             status        VARCHAR(50)         NOT NULL DEFAULT 'pending',
             last_activity DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            synced_at     DATETIME            DEFAULT NULL,
-            email_sent_at DATETIME            DEFAULT NULL,
+            synced_at      DATETIME            DEFAULT NULL,
+            email_sent_at  DATETIME            DEFAULT NULL,
+            email_2_sent_at DATETIME           DEFAULT NULL,
+            email_3_sent_at DATETIME           DEFAULT NULL,
             PRIMARY KEY (id),
             UNIQUE KEY session_id (session_id),
             KEY status (status),
@@ -191,32 +193,60 @@ class AB_DB {
         );
     }
 
-    public static function get_carts_for_followup( $delay_minutes = 60 ) {
+    /**
+     * Get carts ready for follow-up email N (1, 2, or 3).
+     *
+     * Email 1: sent after $delay minutes of no activity.
+     * Email 2: sent $delay minutes after email 1 was sent.
+     * Email 3: sent $delay minutes after email 2 was sent.
+     */
+    public static function get_carts_for_followup( $step = 1, $delay_minutes = 60 ) {
         global $wpdb;
         $table = self::table();
-        return $wpdb->get_results(
-            $wpdb->prepare(
+
+        $base = "email IS NOT NULL AND email != '' AND cart_total > 0 AND status IN ('pending','synced')";
+
+        if ( $step === 1 ) {
+            $sql = $wpdb->prepare(
                 "SELECT * FROM {$table}
-                 WHERE email IS NOT NULL
-                   AND email != ''
-                   AND cart_total > 0
-                   AND status IN ('pending', 'synced')
+                 WHERE {$base}
                    AND email_sent_at IS NULL
                    AND last_activity < DATE_SUB( NOW(), INTERVAL %d MINUTE )
-                 ORDER BY last_activity ASC
-                 LIMIT 20",
+                 ORDER BY last_activity ASC LIMIT 20",
                 $delay_minutes
-            ),
-            ARRAY_A
-        );
+            );
+        } elseif ( $step === 2 ) {
+            $sql = $wpdb->prepare(
+                "SELECT * FROM {$table}
+                 WHERE {$base}
+                   AND email_sent_at IS NOT NULL
+                   AND email_2_sent_at IS NULL
+                   AND email_sent_at < DATE_SUB( NOW(), INTERVAL %d MINUTE )
+                 ORDER BY email_sent_at ASC LIMIT 20",
+                $delay_minutes
+            );
+        } else {
+            $sql = $wpdb->prepare(
+                "SELECT * FROM {$table}
+                 WHERE {$base}
+                   AND email_2_sent_at IS NOT NULL
+                   AND email_3_sent_at IS NULL
+                   AND email_2_sent_at < DATE_SUB( NOW(), INTERVAL %d MINUTE )
+                 ORDER BY email_2_sent_at ASC LIMIT 20",
+                $delay_minutes
+            );
+        }
+
+        return $wpdb->get_results( $sql, ARRAY_A );
     }
 
-    public static function mark_email_sent( $session_id ) {
+    public static function mark_email_sent( $step, $session_id ) {
         global $wpdb;
+        $col = $step === 1 ? 'email_sent_at' : ( $step === 2 ? 'email_2_sent_at' : 'email_3_sent_at' );
         $wpdb->update(
             self::table(),
-            [ 'email_sent_at' => current_time( 'mysql' ) ],
-            [ 'session_id'    => $session_id ]
+            [ $col => current_time( 'mysql' ) ],
+            [ 'session_id' => $session_id ]
         );
     }
 }
@@ -476,27 +506,52 @@ class Abandonment_Buddy {
             return;
         }
 
-        $delay = (int) ( $this->settings['followup_delay'] ?? 60 );
-        $rows  = AB_DB::get_carts_for_followup( $delay );
-
-        foreach ( $rows as $row ) {
-            $cart_items = json_decode( $row['cart_items'] ?? '[]', true );
-            if ( empty( $cart_items ) || empty( $row['email'] ) ) {
-                continue;
+        // Email 1
+        $delay1 = max( 1, (int) ( $this->settings['followup_delay'] ?? 60 ) );
+        foreach ( AB_DB::get_carts_for_followup( 1, $delay1 ) as $row ) {
+            $items = json_decode( $row['cart_items'] ?? '[]', true );
+            if ( ! empty( $items ) && ! empty( $row['email'] ) ) {
+                if ( $this->send_followup_email( 1, $row, $items ) ) {
+                    AB_DB::mark_email_sent( 1, $row['session_id'] );
+                }
             }
+        }
 
-            $sent = $this->send_followup_email( $row, $cart_items );
-            if ( $sent ) {
-                AB_DB::mark_email_sent( $row['session_id'] );
+        // Email 2 (optional)
+        $delay2 = (int) ( $this->settings['followup_delay_2'] ?? 0 );
+        if ( $delay2 > 0 ) {
+            foreach ( AB_DB::get_carts_for_followup( 2, $delay2 ) as $row ) {
+                $items = json_decode( $row['cart_items'] ?? '[]', true );
+                if ( ! empty( $items ) && ! empty( $row['email'] ) ) {
+                    if ( $this->send_followup_email( 2, $row, $items ) ) {
+                        AB_DB::mark_email_sent( 2, $row['session_id'] );
+                    }
+                }
+            }
+        }
+
+        // Email 3 (optional)
+        $delay3 = (int) ( $this->settings['followup_delay_3'] ?? 0 );
+        if ( $delay3 > 0 ) {
+            foreach ( AB_DB::get_carts_for_followup( 3, $delay3 ) as $row ) {
+                $items = json_decode( $row['cart_items'] ?? '[]', true );
+                if ( ! empty( $items ) && ! empty( $row['email'] ) ) {
+                    if ( $this->send_followup_email( 3, $row, $items ) ) {
+                        AB_DB::mark_email_sent( 3, $row['session_id'] );
+                    }
+                }
             }
         }
     }
 
-    private function send_followup_email( $cart, $cart_items ) {
-        $to      = $cart['email'];
-        $subject = ! empty( $this->settings['followup_subject'] )
+    private function send_followup_email( $step, $cart, $cart_items ) {
+        $to = $cart['email'];
+
+        $base_subject = ! empty( $this->settings['followup_subject'] )
             ? $this->settings['followup_subject']
             : sprintf( __( 'You left something behind at %s', 'abandonment-buddy' ), get_bloginfo( 'name' ) );
+
+        $subject = $step === 1 ? $base_subject : "Reminder #{$step}: {$base_subject}";
 
         $from_name  = ! empty( $this->settings['followup_from_name'] )
             ? $this->settings['followup_from_name']
@@ -510,17 +565,18 @@ class Abandonment_Buddy {
             "From: {$from_name} <{$from_email}>",
         ];
 
-        $html = $this->build_followup_html( $cart, $cart_items );
+        $html = $this->build_followup_html( $step, $cart, $cart_items );
 
         return wp_mail( $to, $subject, $html, $headers );
     }
 
-    private function build_followup_html( $cart, $cart_items ) {
+    private function build_followup_html( $step, $cart, $cart_items ) {
         $site_name    = get_bloginfo( 'name' );
         $checkout_url = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : home_url( '/checkout/' );
         $first_name   = $cart['name'] ? explode( ' ', trim( $cart['name'] ) )[0] : 'there';
         $currency     = get_woocommerce_currency_symbol();
-        $custom_msg   = ! empty( $this->settings['followup_message'] ) ? wpautop( esc_html( $this->settings['followup_message'] ) ) : '';
+        $msg_key      = $step === 1 ? 'followup_message' : "followup_message_{$step}";
+        $custom_msg   = ! empty( $this->settings[ $msg_key ] ) ? wpautop( esc_html( $this->settings[ $msg_key ] ) ) : '';
         $site_logo    = function_exists( 'get_custom_logo' ) ? get_custom_logo() : '';
 
         // Build items rows
@@ -713,11 +769,15 @@ class Abandonment_Buddy {
 
         // Follow-up email settings
         $settings['followup_enabled']    = ! empty( $_POST['followup_enabled'] );
-        $settings['followup_delay']      = max( 5, (int) ( $_POST['followup_delay'] ?? 60 ) );
-        $settings['followup_subject']    = sanitize_text_field( $_POST['followup_subject']    ?? '' );
-        $settings['followup_from_name']  = sanitize_text_field( $_POST['followup_from_name']  ?? '' );
-        $settings['followup_from_email'] = sanitize_email(      $_POST['followup_from_email'] ?? '' );
-        $settings['followup_message']    = sanitize_textarea_field( $_POST['followup_message'] ?? '' );
+        $settings['followup_delay']      = max( 1, (int) ( $_POST['followup_delay']   ?? 60 ) );
+        $settings['followup_delay_2']    = max( 0, (int) ( $_POST['followup_delay_2'] ?? 0  ) );
+        $settings['followup_delay_3']    = max( 0, (int) ( $_POST['followup_delay_3'] ?? 0  ) );
+        $settings['followup_subject']    = sanitize_text_field( $_POST['followup_subject']     ?? '' );
+        $settings['followup_from_name']  = sanitize_text_field( $_POST['followup_from_name']   ?? '' );
+        $settings['followup_from_email'] = sanitize_email(      $_POST['followup_from_email']  ?? '' );
+        $settings['followup_message']    = sanitize_textarea_field( $_POST['followup_message']   ?? '' );
+        $settings['followup_message_2']  = sanitize_textarea_field( $_POST['followup_message_2'] ?? '' );
+        $settings['followup_message_3']  = sanitize_textarea_field( $_POST['followup_message_3'] ?? '' );
 
         update_option( AB_OPTION_KEY, $settings );
         delete_site_transient( 'update_plugins' );
@@ -1052,12 +1112,16 @@ class Abandonment_Buddy {
                                 <?php wp_nonce_field( 'ab_save_settings' ); ?>
                                 <input type="hidden" name="action" value="ab_save">
                                 <!-- carry over followup settings so they aren't wiped on connection save -->
-                                <input type="hidden" name="followup_enabled"    value="<?php echo $s['followup_enabled']    ? '1' : ''; ?>">
+                                <input type="hidden" name="followup_enabled"    value="<?php echo ! empty( $s['followup_enabled'] ) ? '1' : ''; ?>">
                                 <input type="hidden" name="followup_delay"      value="<?php echo esc_attr( $s['followup_delay']      ?? 60 ); ?>">
+                                <input type="hidden" name="followup_delay_2"    value="<?php echo esc_attr( $s['followup_delay_2']    ?? 0  ); ?>">
+                                <input type="hidden" name="followup_delay_3"    value="<?php echo esc_attr( $s['followup_delay_3']    ?? 0  ); ?>">
                                 <input type="hidden" name="followup_subject"    value="<?php echo esc_attr( $s['followup_subject']    ?? '' ); ?>">
                                 <input type="hidden" name="followup_from_name"  value="<?php echo esc_attr( $s['followup_from_name']  ?? '' ); ?>">
                                 <input type="hidden" name="followup_from_email" value="<?php echo esc_attr( $s['followup_from_email'] ?? '' ); ?>">
                                 <input type="hidden" name="followup_message"    value="<?php echo esc_attr( $s['followup_message']    ?? '' ); ?>">
+                                <input type="hidden" name="followup_message_2"  value="<?php echo esc_attr( $s['followup_message_2']  ?? '' ); ?>">
+                                <input type="hidden" name="followup_message_3"  value="<?php echo esc_attr( $s['followup_message_3']  ?? '' ); ?>">
 
                                 <?php
                                 $fields = [
@@ -1157,18 +1221,18 @@ class Abandonment_Buddy {
                     <input type="hidden" name="api_secret" value="<?php echo esc_attr( $s['api_secret'] ?? '' ); ?>">
 
                     <div class="ab-card">
-                        <h3 class="ab-card-title">Follow-up Email</h3>
-                        <p class="ab-hint" style="margin-top:-4px;margin-bottom:16px;">Automatically email customers who abandon checkout after a set delay. Uses WordPress <code>wp_mail()</code>.</p>
+                        <h3 class="ab-card-title">Follow-up Email Sequence</h3>
+                        <p class="ab-hint" style="margin-top:-4px;margin-bottom:16px;">Send up to 3 recovery emails per abandoned cart at different intervals. All emails use WordPress <code>wp_mail()</code>.</p>
 
                         <!-- Enable toggle -->
-                        <div class="ab-field" style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+                        <div class="ab-field" style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:20px;">
                             <label class="ab-toggle" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
                                 <input type="checkbox" name="followup_enabled" value="1" <?php checked( ! empty( $s['followup_enabled'] ) ); ?> style="opacity:0;width:0;height:0;position:absolute;">
                                 <span class="ab-toggle-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#cbd5e1;border-radius:24px;transition:.3s;"></span>
                             </label>
                             <div>
-                                <div style="font-size:13px;font-weight:600;color:#0f172a;">Enable follow-up emails</div>
-                                <div style="font-size:12px;color:#64748b;">Send one recovery email per abandoned cart when the delay has passed</div>
+                                <div style="font-size:13px;font-weight:600;color:#0f172a;">Enable follow-up email sequence</div>
+                                <div style="font-size:12px;color:#64748b;">Enabled emails send automatically every 5 minutes via WP cron</div>
                             </div>
                         </div>
                         <style>
@@ -1177,54 +1241,69 @@ class Abandonment_Buddy {
                             .ab-toggle input:checked + .ab-toggle-slider::before { transform: translateX(20px); }
                         </style>
 
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
-                            <!-- Delay -->
-                            <div class="ab-field">
-                                <label class="ab-label" for="ab_followup_delay">Send after (minutes)</label>
-                                <input class="ab-input" type="number" id="ab_followup_delay" name="followup_delay"
-                                       value="<?php echo esc_attr( $s['followup_delay'] ?? 60 ); ?>"
-                                       min="5" max="10080" placeholder="60">
-                                <p class="ab-hint">Minimum 5 minutes. 60 = 1 hour, 1440 = 1 day.</p>
-                            </div>
-
-                            <!-- From name -->
+                        <!-- From / Subject (shared) -->
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px;">
                             <div class="ab-field">
                                 <label class="ab-label" for="ab_followup_from_name">From name</label>
                                 <input class="ab-input" type="text" id="ab_followup_from_name" name="followup_from_name"
                                        value="<?php echo esc_attr( $s['followup_from_name'] ?? '' ); ?>"
                                        placeholder="<?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
-                                <p class="ab-hint">Defaults to your site name if blank.</p>
                             </div>
-
-                            <!-- Subject -->
-                            <div class="ab-field">
-                                <label class="ab-label" for="ab_followup_subject">Email subject</label>
-                                <input class="ab-input" type="text" id="ab_followup_subject" name="followup_subject"
-                                       value="<?php echo esc_attr( $s['followup_subject'] ?? '' ); ?>"
-                                       placeholder="You left something behind at <?php echo esc_attr( get_bloginfo( 'name' ) ); ?>">
-                                <p class="ab-hint">Leave blank for the default subject line.</p>
-                            </div>
-
-                            <!-- From email -->
                             <div class="ab-field">
                                 <label class="ab-label" for="ab_followup_from_email">From email</label>
                                 <input class="ab-input" type="email" id="ab_followup_from_email" name="followup_from_email"
                                        value="<?php echo esc_attr( $s['followup_from_email'] ?? '' ); ?>"
                                        placeholder="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
-                                <p class="ab-hint">Defaults to admin email if blank.</p>
+                            </div>
+                            <div class="ab-field">
+                                <label class="ab-label" for="ab_followup_subject">Subject line</label>
+                                <input class="ab-input" type="text" id="ab_followup_subject" name="followup_subject"
+                                       value="<?php echo esc_attr( $s['followup_subject'] ?? '' ); ?>"
+                                       placeholder="You left something behind">
+                                <p class="ab-hint">Email 2 &amp; 3 auto-prefix "Reminder #2:" etc.</p>
                             </div>
                         </div>
 
-                        <!-- Custom message -->
-                        <div class="ab-field" style="margin-top:4px;">
-                            <label class="ab-label" for="ab_followup_message">Custom message (optional)</label>
-                            <textarea class="ab-input" id="ab_followup_message" name="followup_message"
-                                      rows="3" style="resize:vertical;"
-                                      placeholder="e.g. Use code COMEBACK10 for 10% off your order today."><?php echo esc_textarea( $s['followup_message'] ?? '' ); ?></textarea>
-                            <p class="ab-hint">Shown above the cart items in the email. Leave blank to omit.</p>
+                        <!-- 3-step sequence rows -->
+                        <?php
+                        $steps = [
+                            1 => [ 'label' => 'Email 1', 'color' => '#14b8a6', 'delay_key' => 'followup_delay',   'msg_key' => 'followup_message',   'delay_default' => 60, 'delay_hint' => 'Minutes after cart abandonment' ],
+                            2 => [ 'label' => 'Email 2', 'color' => '#f59e0b', 'delay_key' => 'followup_delay_2', 'msg_key' => 'followup_message_2', 'delay_default' => 0,  'delay_hint' => 'Minutes after Email 1 (0 = disabled)' ],
+                            3 => [ 'label' => 'Email 3', 'color' => '#6366f1', 'delay_key' => 'followup_delay_3', 'msg_key' => 'followup_message_3', 'delay_default' => 0,  'delay_hint' => 'Minutes after Email 2 (0 = disabled)' ],
+                        ];
+                        foreach ( $steps as $n => $step ) :
+                            $delay_val = (int) ( $s[ $step['delay_key'] ] ?? $step['delay_default'] );
+                            $msg_val   = $s[ $step['msg_key'] ] ?? '';
+                        ?>
+                        <div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:12px;">
+                            <div style="background:<?php echo esc_attr( $step['color'] ); ?>18;border-bottom:1px solid #e2e8f0;padding:10px 16px;display:flex;align-items:center;gap:10px;">
+                                <span style="background:<?php echo esc_attr( $step['color'] ); ?>;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;"><?php echo $n; ?></span>
+                                <strong style="font-size:13px;color:#0f172a;"><?php echo esc_html( $step['label'] ); ?></strong>
+                                <?php if ( $n > 1 && $delay_val === 0 ) : ?>
+                                    <span style="margin-left:auto;font-size:11px;color:#94a3b8;font-weight:600;">DISABLED (delay = 0)</span>
+                                <?php endif; ?>
+                            </div>
+                            <div style="padding:14px 16px;display:grid;grid-template-columns:180px 1fr;gap:14px;align-items:start;">
+                                <div class="ab-field" style="margin:0;">
+                                    <label class="ab-label" for="ab_<?php echo esc_attr( $step['delay_key'] ); ?>">Delay (minutes)</label>
+                                    <input class="ab-input" type="number" id="ab_<?php echo esc_attr( $step['delay_key'] ); ?>"
+                                           name="<?php echo esc_attr( $step['delay_key'] ); ?>"
+                                           value="<?php echo esc_attr( $delay_val ); ?>"
+                                           min="<?php echo $n === 1 ? 1 : 0; ?>" max="100080">
+                                    <p class="ab-hint" style="margin-top:4px;"><?php echo esc_html( $step['delay_hint'] ); ?></p>
+                                </div>
+                                <div class="ab-field" style="margin:0;">
+                                    <label class="ab-label" for="ab_<?php echo esc_attr( $step['msg_key'] ); ?>">Custom message (optional)</label>
+                                    <textarea class="ab-input" id="ab_<?php echo esc_attr( $step['msg_key'] ); ?>"
+                                              name="<?php echo esc_attr( $step['msg_key'] ); ?>"
+                                              rows="2" style="resize:vertical;"
+                                              placeholder="e.g. Use code COMEBACK10 for 10% off."><?php echo esc_textarea( $msg_val ); ?></textarea>
+                                </div>
+                            </div>
                         </div>
+                        <?php endforeach; ?>
 
-                        <div class="ab-row" style="margin-top:20px;">
+                        <div class="ab-row" style="margin-top:8px;">
                             <button type="submit" class="ab-btn-primary">Save Follow-up Settings</button>
                         </div>
                     </div>
