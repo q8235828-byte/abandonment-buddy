@@ -1,4 +1,4 @@
-import { Controller, Get, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ZipArchive } from 'archiver';
 import * as fs from 'node:fs';
@@ -119,5 +119,34 @@ export class PluginController {
       whatsappRecovered,
       smsRecovered,
     };
+  }
+
+  /** Called by the WP plugin after each email step is sent via wp_mail(). */
+  @Post('email-step')
+  async markEmailStep(@Req() req: Request, @Body() body: { session_id: string; step: number }) {
+    const apiKey  = req.headers['x-ab-api-key']  as string;
+    const storeId = req.headers['x-ab-store-id'] as string;
+
+    if (!apiKey || !storeId || !body.session_id || !body.step) {
+      return { error: 'Missing required fields' };
+    }
+
+    const store = await this.prisma.store.findFirst({ where: { id: storeId, apiKey } });
+    if (!store) return { error: 'Invalid credentials' };
+
+    const order = await this.prisma.abandonedOrder.findFirst({
+      where: { storeId: store.id, sessionId: body.session_id },
+    });
+    if (!order) return { error: 'Order not found' };
+
+    const field = body.step === 1 ? 'emailSentAt' : body.step === 2 ? 'emailStep2SentAt' : 'emailStep3SentAt';
+    const now   = new Date();
+
+    await this.prisma.abandonedOrder.update({
+      where: { id: order.id },
+      data:  { [field]: now },
+    });
+
+    return { ok: true, field, time: now.toISOString() };
   }
 }

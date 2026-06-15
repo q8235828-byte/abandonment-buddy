@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.7
+Stable tag: 1.5.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,10 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.8 =
+* Fix: cart total in email now always equals sum of item totals (was showing pre-tax subtotal vs tax-inclusive item totals)
+* Fix: after each email step is sent, plugin notifies cloud API (POST /plugin/email-step) so web dashboard Recovery Timeline and Email Engagement panels show real timestamps instead of "Not yet"
 
 = 1.5.7 =
 * Follow-up email sequence: send up to 3 recovery emails per abandoned cart at configurable delays

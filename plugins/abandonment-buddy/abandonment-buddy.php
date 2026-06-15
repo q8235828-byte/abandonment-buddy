@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.7
+ * Version:     1.5.8
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.7' );
+define( 'AB_VERSION',    '1.5.8' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.3' );
@@ -337,13 +337,16 @@ class Abandonment_Buddy {
             ];
         }
 
+        // Sum item totals (tax-inclusive) so cartTotal is always consistent with displayed item rows.
+        $cart_total = array_sum( array_column( $items, 'total' ) );
+
         return [
             'sessionId'     => $session_id,
             'customerEmail' => $email ?: null,
             'customerName'  => $name,
             'customerPhone' => $phone,
             'cartItems'     => $items,
-            'cartTotal'     => (float) $cart->get_cart_contents_total(),
+            'cartTotal'     => $cart_total,
         ];
     }
 
@@ -513,6 +516,7 @@ class Abandonment_Buddy {
             if ( ! empty( $items ) && ! empty( $row['email'] ) ) {
                 if ( $this->send_followup_email( 1, $row, $items ) ) {
                     AB_DB::mark_email_sent( 1, $row['session_id'] );
+                    $this->notify_api_email_step( 1, $row['session_id'] );
                 }
             }
         }
@@ -525,6 +529,7 @@ class Abandonment_Buddy {
                 if ( ! empty( $items ) && ! empty( $row['email'] ) ) {
                     if ( $this->send_followup_email( 2, $row, $items ) ) {
                         AB_DB::mark_email_sent( 2, $row['session_id'] );
+                        $this->notify_api_email_step( 2, $row['session_id'] );
                     }
                 }
             }
@@ -538,10 +543,30 @@ class Abandonment_Buddy {
                 if ( ! empty( $items ) && ! empty( $row['email'] ) ) {
                     if ( $this->send_followup_email( 3, $row, $items ) ) {
                         AB_DB::mark_email_sent( 3, $row['session_id'] );
+                        $this->notify_api_email_step( 3, $row['session_id'] );
                     }
                 }
             }
         }
+    }
+
+    private function notify_api_email_step( $step, $session_id ) {
+        $api_url  = rtrim( $this->settings['api_url']  ?? '', '/' );
+        $api_key  = $this->settings['api_key']  ?? '';
+        $store_id = $this->settings['store_id'] ?? '';
+        if ( ! $api_url || ! $api_key || ! $store_id ) {
+            return;
+        }
+        wp_remote_post( "{$api_url}/plugin/email-step", [
+            'timeout'     => 10,
+            'blocking'    => false,
+            'headers'     => [
+                'Content-Type'    => 'application/json',
+                'x-ab-api-key'   => $api_key,
+                'x-ab-store-id'  => $store_id,
+            ],
+            'body' => wp_json_encode( [ 'session_id' => $session_id, 'step' => $step ] ),
+        ] );
     }
 
     private function send_followup_email( $step, $cart, $cart_items ) {
@@ -603,7 +628,10 @@ class Abandonment_Buddy {
             </tr>';
         }
 
-        $total_formatted = $currency . number_format( (float) $cart['cart_total'], 2 );
+        // Recalculate from items so legacy carts with mismatched cart_total are handled correctly.
+        $items_sum       = array_sum( array_column( $cart_items, 'total' ) );
+        $display_total   = $items_sum > 0 ? $items_sum : (float) $cart['cart_total'];
+        $total_formatted = $currency . number_format( $display_total, 2 );
 
         return '<!DOCTYPE html>
 <html lang="en">
