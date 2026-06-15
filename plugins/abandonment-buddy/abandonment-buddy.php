@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.0
+ * Version:     1.4.1
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'AB_VERSION',    '1.4.0' );
+define( 'AB_VERSION',    '1.4.1' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -727,12 +727,12 @@ class Abandonment_Buddy {
 
 class AB_Updater {
 
-    private string $slug;        // abandonment-buddy/abandonment-buddy.php
-    private string $folder;      // abandonment-buddy
-    private string $version;     // currently installed version
-    private string $update_url;  // API base URL for version checks
+    private $slug;        // abandonment-buddy/abandonment-buddy.php
+    private $folder;      // abandonment-buddy
+    private $version;     // currently installed version
+    private $update_url;  // API base URL for version checks
 
-    public function __construct( string $slug, string $version, string $update_url ) {
+    public function __construct( $slug, $version, $update_url ) {
         $this->slug       = $slug;
         $this->folder     = dirname( $slug );
         $this->version    = $version;
@@ -822,7 +822,7 @@ class AB_Updater {
     }
 
     /** Fetch remote version info from the API (cached per request). */
-    private function fetch_remote(): ?object {
+    private function fetch_remote() {
         static $cache = null;
         if ( $cache !== null ) {
             return $cache === false ? null : $cache;
