@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.0
+ * Version:     1.5.1
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.0' );
+define( 'AB_VERSION',    '1.5.1' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -227,13 +227,7 @@ class Abandonment_Buddy {
             return;
         }
 
-        // Cart events
-        add_action( 'woocommerce_add_to_cart',            [ $this, 'on_cart_change' ], 10, 0 );
-        add_action( 'woocommerce_cart_updated',           [ $this, 'on_cart_change' ] );
-        add_action( 'woocommerce_remove_cart_item',       [ $this, 'on_cart_change' ], 10, 0 );
-        add_action( 'woocommerce_cart_item_set_quantity', [ $this, 'on_cart_change' ], 10, 0 );
-
-        // Capture email at checkout
+        // Only capture at checkout when all billing fields are filled
         add_action( 'woocommerce_checkout_update_order_review', [ $this, 'on_checkout_review' ] );
 
         // Order completed
@@ -267,7 +261,7 @@ class Abandonment_Buddy {
         return (string) WC()->session->get_customer_id();
     }
 
-    private function build_cart_data( $session_id, $email = '' ) {
+    private function build_cart_data( $session_id, $email = '', $name = null, $phone = null ) {
         $cart  = WC()->cart;
         $items = [];
 
@@ -283,16 +277,11 @@ class Abandonment_Buddy {
             ];
         }
 
-        $billing_email = $email ?: ( WC()->customer ? WC()->customer->get_billing_email() : '' );
-        $first         = WC()->customer ? WC()->customer->get_billing_first_name() : '';
-        $last          = WC()->customer ? WC()->customer->get_billing_last_name() : '';
-        $phone         = WC()->customer ? WC()->customer->get_billing_phone() : '';
-
         return [
             'sessionId'     => $session_id,
-            'customerEmail' => $billing_email ?: null,
-            'customerName'  => trim( $first . ' ' . $last ) ?: null,
-            'customerPhone' => $phone ?: null,
+            'customerEmail' => $email ?: null,
+            'customerName'  => $name,
+            'customerPhone' => $phone,
             'cartItems'     => $items,
             'cartTotal'     => (float) $cart->get_cart_contents_total(),
         ];
@@ -323,9 +312,12 @@ class Abandonment_Buddy {
         return ! is_wp_error( $response );
     }
 
-    // ── Cart event handlers ───────────────────────────────────────────────────
+    // ── Checkout capture ─────────────────────────────────────────────────────
+    // Only fires when the user is on the checkout page and updates a field.
+    // We require email + first name + last name + phone to all be present
+    // before saving or pushing — no partial/anonymous captures.
 
-    public function on_cart_change() {
+    public function on_checkout_review( $post_data ) {
         if ( ! function_exists( 'WC' ) || ! WC()->session || ! WC()->cart ) {
             return;
         }
@@ -335,63 +327,36 @@ class Abandonment_Buddy {
             return;
         }
 
-        $data = $this->build_cart_data( $session_id );
+        $parsed = [];
+        parse_str( $post_data, $parsed );
 
-        // 1. Save to local WordPress DB
+        $email      = sanitize_email( $parsed['billing_email']      ?? '' );
+        $first_name = sanitize_text_field( $parsed['billing_first_name'] ?? '' );
+        $last_name  = sanitize_text_field( $parsed['billing_last_name']  ?? '' );
+        $phone      = sanitize_text_field( $parsed['billing_phone']      ?? '' );
+
+        // All four fields must be filled before we capture anything
+        if ( ! is_email( $email ) || ! $first_name || ! $last_name || ! $phone ) {
+            return;
+        }
+
+        $name = trim( $first_name . ' ' . $last_name );
+        $data = $this->build_cart_data( $session_id, $email, $name, $phone );
+
+        if ( empty( $data['cartItems'] ) ) {
+            return;
+        }
+
         AB_DB::upsert( [
             'session_id' => $session_id,
-            'email'      => $data['customerEmail'],
-            'name'       => $data['customerName'],
-            'phone'      => $data['customerPhone'],
+            'email'      => $email,
+            'name'       => $name,
+            'phone'      => $phone,
             'cart_items' => wp_json_encode( $data['cartItems'] ),
             'cart_total' => $data['cartTotal'],
         ] );
 
-        // 2. Push to API immediately (non-blocking)
-        if ( ! empty( $data['cartItems'] ) ) {
-            $body = wp_json_encode( $data );
-            $sig  = $this->sign( $body );
-            wp_remote_post(
-                $this->api_url( '/webhooks/cart-session/' . ( $this->settings['store_id'] ?? '' ) ),
-                [
-                    'timeout'     => 5,
-                    'blocking'    => false,
-                    'headers'     => [
-                        'Content-Type'   => 'application/json',
-                        'X-AB-Signature' => $sig,
-                    ],
-                    'body'        => $body,
-                ]
-            );
-        }
-    }
-
-    public function on_checkout_review( $post_data ) {
-        $session_id = $this->session_key();
-        if ( ! $session_id ) {
-            return;
-        }
-
-        $parsed = [];
-        parse_str( $post_data, $parsed );
-        $email = sanitize_email( $parsed['billing_email'] ?? '' );
-
-        if ( $email && is_email( $email ) ) {
-            $data = $this->build_cart_data( $session_id, $email );
-
-            // Update local DB with email
-            AB_DB::upsert( [
-                'session_id' => $session_id,
-                'email'      => $email,
-                'name'       => $data['customerName'],
-                'phone'      => $data['customerPhone'],
-                'cart_items' => wp_json_encode( $data['cartItems'] ),
-                'cart_total' => $data['cartTotal'],
-            ] );
-
-            // Push to API with email now captured
-            $this->push_to_api( $data );
-        }
+        $this->push_to_api( $data );
     }
 
     // ── Order handlers ────────────────────────────────────────────────────────

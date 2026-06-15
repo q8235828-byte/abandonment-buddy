@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,11 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.1 =
+* Only capture on the checkout page — removed cart-level tracking hooks
+* Require all billing fields (email, first name, last name, phone) before saving or pushing to API
+* Read all field values directly from checkout form POST data instead of WC customer session
 
 = 1.5.0 =
 * Auto-write must-use plugin on activation to set FS_METHOD=direct without needing wp-config.php access
