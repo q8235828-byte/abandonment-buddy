@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.3
+ * Version:     1.5.4
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.3' );
+define( 'AB_VERSION',    '1.5.4' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -604,8 +604,9 @@ class Abandonment_Buddy {
         $cleanup_ok     = isset( $_GET['cleanup_ok'] )     ? (int) $_GET['cleanup_ok']     : 0;
         $cleanup_failed = isset( $_GET['cleanup_failed'] ) ? (int) $_GET['cleanup_failed'] : 0;
         $cleanup_none   = isset( $_GET['cleanup_none'] );
+        $active_tab     = isset( $_GET['tab'] ) && $_GET['tab'] === 'settings' ? 'settings' : 'dashboard';
 
-        // Detect duplicate installs of this plugin
+        // Detect duplicate installs
         $duplicates = [];
         foreach ( glob( WP_PLUGIN_DIR . '/*/abandonment-buddy.php' ) as $file ) {
             if ( dirname( $file ) !== dirname( __FILE__ ) ) {
@@ -613,196 +614,291 @@ class Abandonment_Buddy {
             }
         }
 
-        // Show local cart stats
-        $recent_carts = AB_DB::get_all_recent( 10 );
-        $cart_count   = count( AB_DB::get_all_recent( 1000 ) );
+        // Compute stats from local DB
+        $all_carts       = AB_DB::get_all_recent( 5000 );
+        $stat_total      = count( $all_carts );
+        $stat_abandoned  = 0; $stat_synced = 0; $stat_recovered = 0;
+        $val_abandoned   = 0; $val_recovered = 0;
+        foreach ( $all_carts as $c ) {
+            if ( $c['status'] === 'pending'   ) { $stat_abandoned++;  $val_abandoned  += (float) $c['cart_total']; }
+            if ( $c['status'] === 'synced'    ) { $stat_synced++;                                                  }
+            if ( $c['status'] === 'recovered' ) { $stat_recovered++;  $val_recovered  += (float) $c['cart_total']; }
+        }
+        $recovery_rate = $stat_total > 0 ? round( ( $stat_recovered / $stat_total ) * 100 ) : 0;
+        $recent_carts  = array_slice( $all_carts, 0, 20 );
+        $is_connected  = $connected || $just_connected;
         ?>
-        <div class="wrap">
-            <h1 style="display:flex;align-items:center;gap:10px;">
-                <span style="background:#0f172a;color:#fff;padding:6px 10px;border-radius:8px;font-size:14px;font-weight:700;">AB</span>
-                Abandonment Buddy
-            </h1>
 
-            <?php if ( $saved ) : ?>
-                <div class="notice notice-success is-dismissible"><p>✅ Settings saved.</p></div>
-            <?php endif; ?>
+        <style>
+        .ab-wrap { max-width: 1100px; }
+        .ab-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; padding-bottom:16px; border-bottom:1px solid #e2e8f0; }
+        .ab-header-left { display:flex; align-items:center; gap:12px; }
+        .ab-logo-badge { background:#0f172a; color:#fff; padding:6px 10px; border-radius:8px; font-size:14px; font-weight:700; }
+        .ab-logo-name { font-size:20px; font-weight:700; color:#0f172a; }
+        .ab-version-tag { background:#f1f5f9; color:#64748b; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px; }
+        .ab-conn-badge { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:5px 12px; border-radius:20px; }
+        .ab-conn-badge.connected { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+        .ab-conn-badge.disconnected { background:#fef9ec; color:#92400e; border:1px solid #fde68a; }
+        .ab-conn-dot { width:7px; height:7px; border-radius:50%; }
+        .ab-conn-badge.connected .ab-conn-dot { background:#22c55e; }
+        .ab-conn-badge.disconnected .ab-conn-dot { background:#f59e0b; }
 
-            <?php if ( $just_connected ) : ?>
-                <div class="notice notice-success is-dismissible"><p>✅ Store connected successfully! Cart tracking is now active.</p></div>
-            <?php endif; ?>
+        .ab-tabs { display:flex; gap:2px; margin-bottom:24px; border-bottom:2px solid #e2e8f0; }
+        .ab-tab { display:inline-block; padding:10px 20px; font-size:14px; font-weight:600; color:#64748b; text-decoration:none; border-bottom:2px solid transparent; margin-bottom:-2px; transition:color .15s; }
+        .ab-tab:hover { color:#0f172a; }
+        .ab-tab.active { color:#0f172a; border-bottom-color:#0f172a; }
 
-            <?php if ( $cleanup_ok > 0 ) : ?>
-                <div class="notice notice-success is-dismissible"><p>✅ Removed <?php echo $cleanup_ok; ?> duplicate plugin folder(s) successfully.</p></div>
-            <?php elseif ( $cleanup_none ) : ?>
-                <div class="notice notice-info is-dismissible"><p>ℹ️ No duplicate plugin installations found.</p></div>
-            <?php endif; ?>
+        .ab-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+        .ab-stat-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:20px; }
+        .ab-stat-label { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; margin-bottom:8px; }
+        .ab-stat-value { font-size:28px; font-weight:700; color:#0f172a; line-height:1; margin-bottom:4px; }
+        .ab-stat-sub { font-size:12px; color:#64748b; }
+        .ab-stat-card.amber .ab-stat-value { color:#d97706; }
+        .ab-stat-card.blue  .ab-stat-value { color:#2563eb; }
+        .ab-stat-card.green .ab-stat-value { color:#16a34a; }
 
-            <?php if ( $cleanup_failed > 0 ) : ?>
-                <div class="notice notice-error is-dismissible"><p>❌ Could not delete <?php echo $cleanup_failed; ?> folder(s) — your server may need FTP access. Contact your host to delete old <code>abandonment-buddy</code> folders from <code>/wp-content/plugins/</code>.</p></div>
-            <?php endif; ?>
+        .ab-card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:24px; margin-bottom:20px; }
+        .ab-card-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin:0 0 16px; }
+        .ab-carts-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .ab-carts-table th { text-align:left; padding:8px 10px; color:#94a3b8; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid #f1f5f9; }
+        .ab-carts-table th:not(:first-child) { text-align:right; }
+        .ab-carts-table td { padding:10px 10px; border-bottom:1px solid #f8fafc; vertical-align:middle; }
+        .ab-carts-table td:not(:first-child) { text-align:right; }
+        .ab-carts-table tr:last-child td { border-bottom:none; }
+        .ab-badge { display:inline-block; padding:2px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+        .ab-badge-pending   { background:#fef3c7; color:#92400e; }
+        .ab-badge-synced    { background:#dbeafe; color:#1d4ed8; }
+        .ab-badge-recovered { background:#dcfce7; color:#15803d; }
+        .ab-empty { text-align:center; padding:40px 0; color:#94a3b8; font-size:13px; }
 
+        .ab-settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+        .ab-field { margin-bottom:16px; }
+        .ab-label { display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; margin-bottom:6px; }
+        .ab-input { width:100%; padding:9px 12px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; box-sizing:border-box; color:#0f172a; }
+        .ab-input:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+        .ab-btn-primary { background:#0f172a; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; transition:background .15s; }
+        .ab-btn-primary:hover { background:#1e293b; }
+        .ab-btn-secondary { background:#fff; color:#374151; border:1px solid #d1d5db; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; transition:background .15s; }
+        .ab-btn-secondary:hover { background:#f9fafb; }
+        .ab-btn-ghost { background:#f8fafc; color:#475569; border:1px solid #e2e8f0; padding:9px 18px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; width:100%; transition:background .15s; }
+        .ab-btn-ghost:hover { background:#f1f5f9; }
+        .ab-divider { border:none; border-top:1px solid #f1f5f9; margin:20px 0; }
+        .ab-hint { font-size:12px; color:#94a3b8; margin-top:4px; }
+        .ab-row { display:flex; gap:10px; align-items:center; }
+        </style>
+
+        <div class="wrap ab-wrap">
+
+            <!-- Header -->
+            <div class="ab-header">
+                <div class="ab-header-left">
+                    <span class="ab-logo-badge">AB</span>
+                    <span class="ab-logo-name">Abandonment Buddy</span>
+                    <span class="ab-version-tag">v<?php echo AB_VERSION; ?></span>
+                </div>
+                <span class="ab-conn-badge <?php echo $is_connected ? 'connected' : 'disconnected'; ?>">
+                    <span class="ab-conn-dot"></span>
+                    <?php echo $is_connected ? 'Connected &amp; Tracking' : 'Not Connected'; ?>
+                </span>
+            </div>
+
+            <!-- Notices -->
+            <?php if ( $saved ) : ?><div class="notice notice-success is-dismissible"><p>Settings saved.</p></div><?php endif; ?>
+            <?php if ( $just_connected ) : ?><div class="notice notice-success is-dismissible"><p>Store connected successfully! Cart tracking is now active.</p></div><?php endif; ?>
+            <?php if ( $cleanup_ok > 0 ) : ?><div class="notice notice-success is-dismissible"><p>Removed <?php echo $cleanup_ok; ?> duplicate plugin folder(s).</p></div><?php endif; ?>
+            <?php if ( $cleanup_none ) : ?><div class="notice notice-info is-dismissible"><p>No duplicate plugin installations found.</p></div><?php endif; ?>
+            <?php if ( $cleanup_failed > 0 ) : ?><div class="notice notice-error is-dismissible"><p>Could not delete <?php echo $cleanup_failed; ?> folder(s) — contact your host to remove old <code>abandonment-buddy</code> folders from <code>/wp-content/plugins/</code>.</p></div><?php endif; ?>
             <?php if ( ! empty( $duplicates ) ) : ?>
-                <div class="notice notice-warning" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
-                    <p style="margin:0;">⚠️ <strong><?php echo count( $duplicates ); ?> duplicate plugin folder(s) detected:</strong> <?php echo esc_html( implode( ', ', $duplicates ) ); ?>. These are old versions that should be removed.</p>
-                    <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0;">
-                        <?php wp_nonce_field( 'ab_cleanup' ); ?>
-                        <input type="hidden" name="action" value="ab_cleanup">
-                        <button type="submit" class="button button-primary" onclick="return confirm('Delete these old plugin folders?\n\n<?php echo esc_js( implode( '\n', $duplicates ) ); ?>')">
-                            🗑️ Delete duplicate installs
-                        </button>
-                    </form>
-                </div>
+            <div class="notice notice-warning" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 16px;">
+                <p style="margin:0;"><strong><?php echo count( $duplicates ); ?> duplicate plugin folder(s) detected:</strong> <?php echo esc_html( implode( ', ', $duplicates ) ); ?></p>
+                <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0;">
+                    <?php wp_nonce_field( 'ab_cleanup' ); ?>
+                    <input type="hidden" name="action" value="ab_cleanup">
+                    <button type="submit" class="button button-primary" onclick="return confirm('Delete these old plugin folders?\n\n<?php echo esc_js( implode( '\n', $duplicates ) ); ?>')">Delete duplicate installs</button>
+                </form>
+            </div>
             <?php endif; ?>
+            <?php if ( $error ) : ?><div class="notice notice-error is-dismissible"><p><?php echo esc_html( $error ); ?></p></div><?php endif; ?>
 
-            <?php if ( $error ) : ?>
-                <div class="notice notice-error is-dismissible"><p>❌ <?php echo esc_html( $error ); ?></p></div>
-            <?php endif; ?>
+            <!-- Tabs -->
+            <div class="ab-tabs">
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=abandonment-buddy&tab=dashboard' ) ); ?>" class="ab-tab <?php echo $active_tab === 'dashboard' ? 'active' : ''; ?>">Dashboard</a>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=abandonment-buddy&tab=settings' ) ); ?>"  class="ab-tab <?php echo $active_tab === 'settings'  ? 'active' : ''; ?>">Settings</a>
+            </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:960px;margin-top:20px;">
+            <?php if ( $active_tab === 'dashboard' ) : ?>
 
-                <!-- Left column -->
-                <div>
-                    <!-- Status banner -->
-                    <?php $is_connected = $connected || $just_connected; ?>
-                    <div style="background:<?php echo $is_connected ? '#f0fdf4' : '#fef9ec'; ?>;border:1px solid <?php echo $is_connected ? '#bbf7d0' : '#fde68a'; ?>;border-radius:8px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;">
-                        <span style="font-size:22px;"><?php echo $is_connected ? '🟢' : '🟡'; ?></span>
-                        <div>
-                            <strong style="font-size:15px;"><?php echo $is_connected ? 'Connected &amp; Tracking' : 'Not Connected'; ?></strong><br>
-                            <span style="color:#64748b;font-size:12px;">
-                                <?php if ( $is_connected ) {
-                                    echo 'Store ID: <code>' . esc_html( $s['store_id'] ?? '' ) . '</code>';
-                                    if ( ! empty( $s['connected_at'] ) ) {
-                                        echo ' &nbsp;·&nbsp; Since: ' . esc_html( $s['connected_at'] );
-                                    }
-                                } else {
-                                    echo 'Enter your credentials below and click Save &amp; Connect.';
-                                } ?>
-                            </span>
-                        </div>
+                <!-- Stat cards -->
+                <div class="ab-stat-grid">
+                    <div class="ab-stat-card">
+                        <div class="ab-stat-label">Total Captured</div>
+                        <div class="ab-stat-value"><?php echo $stat_total; ?></div>
+                        <div class="ab-stat-sub">at checkout</div>
                     </div>
-
-                    <!-- Settings form -->
-                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:16px;">
-                        <h3 style="margin:0 0 14px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">Connection Settings</h3>
-                        <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                            <?php wp_nonce_field( 'ab_save_settings' ); ?>
-                            <input type="hidden" name="action" value="ab_save">
-                            <table style="width:100%;border-collapse:collapse;">
-                                <?php
-                                $fields = [
-                                    'api_url'    => [ 'API URL',    'url',      'https://your-api.up.railway.app' ],
-                                    'store_id'   => [ 'Store ID',   'text',     'cmq3bxx...' ],
-                                    'api_key'    => [ 'API Key',    'text',     'ck_...' ],
-                                    'api_secret' => [ 'API Secret', 'password', 'cs_...' ],
-                                ];
-                                foreach ( $fields as $name => [ $label, $type, $placeholder ] ) :
-                                ?>
-                                <tr>
-                                    <td style="padding:8px 0;width:100px;color:#374151;font-size:13px;font-weight:600;"><?php echo esc_html( $label ); ?></td>
-                                    <td style="padding:8px 0;">
-                                        <input type="<?php echo esc_attr( $type ); ?>"
-                                               name="<?php echo esc_attr( $name ); ?>"
-                                               value="<?php echo esc_attr( $s[ $name ] ?? '' ); ?>"
-                                               placeholder="<?php echo esc_attr( $placeholder ); ?>"
-                                               style="width:100%;padding:7px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;box-sizing:border-box;">
-                                    </td>
-                                </tr>
-                                <?php endforeach; ?>
-                            </table>
-                            <div style="display:flex;gap:10px;margin-top:14px;">
-                                <button type="submit" class="button button-secondary">Save Settings</button>
-                            </div>
-                        </form>
+                    <div class="ab-stat-card amber">
+                        <div class="ab-stat-label">Abandoned</div>
+                        <div class="ab-stat-value"><?php echo $stat_abandoned; ?></div>
+                        <div class="ab-stat-sub"><?php echo wc_price( $val_abandoned ); ?> at risk</div>
                     </div>
-
-                    <!-- Connect form -->
-                    <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                        <?php wp_nonce_field( 'ab_connect' ); ?>
-                        <input type="hidden" name="action"     value="ab_connect">
-                        <input type="hidden" name="api_url"    value="<?php echo esc_attr( $s['api_url']    ?? '' ); ?>">
-                        <input type="hidden" name="store_id"   value="<?php echo esc_attr( $s['store_id']   ?? '' ); ?>">
-                        <input type="hidden" name="api_key"    value="<?php echo esc_attr( $s['api_key']    ?? '' ); ?>">
-                        <input type="hidden" name="api_secret" value="<?php echo esc_attr( $s['api_secret'] ?? '' ); ?>">
-                        <button type="submit" style="width:100%;background:#0f172a;color:#fff;border:none;padding:10px 0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;">
-                            🔌 Save &amp; Connect to Abandonment Buddy
-                        </button>
-                        <p style="margin:6px 0 0;color:#94a3b8;font-size:12px;text-align:center;">Verifies credentials and activates live cart tracking</p>
-                    </form>
-
-                    <!-- Check for updates -->
-                    <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:10px;">
-                        <?php wp_nonce_field( 'ab_check_updates' ); ?>
-                        <input type="hidden" name="action" value="ab_check_updates">
-                        <button type="submit" style="width:100%;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:8px 0;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;">
-                            🔄 Check for plugin updates
-                        </button>
-                    </form>
+                    <div class="ab-stat-card blue">
+                        <div class="ab-stat-label">Synced to App</div>
+                        <div class="ab-stat-value"><?php echo $stat_synced; ?></div>
+                        <div class="ab-stat-sub">sent to campaigns</div>
+                    </div>
+                    <div class="ab-stat-card green">
+                        <div class="ab-stat-label">Recovered</div>
+                        <div class="ab-stat-value"><?php echo $stat_recovered; ?></div>
+                        <div class="ab-stat-sub"><?php echo wc_price( $val_recovered ); ?> recovered &middot; <?php echo $recovery_rate; ?>% rate</div>
+                    </div>
                 </div>
 
-                <!-- Right column: local cart DB -->
-                <div>
-                    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;">
-                        <h3 style="margin:0 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;">
-                            Local Cart Storage
-                            <span style="float:right;background:#f1f5f9;color:#0f172a;padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700;"><?php echo (int) $cart_count; ?> total</span>
-                        </h3>
-                        <p style="color:#94a3b8;font-size:12px;margin:0 0 14px;">Carts saved in WordPress DB before syncing to your app.</p>
-
-                        <?php if ( empty( $recent_carts ) ) : ?>
-                            <p style="color:#94a3b8;font-size:13px;text-align:center;padding:20px 0;">No carts tracked yet. Add a product to cart to test.</p>
-                        <?php else : ?>
-                            <table style="width:100%;border-collapse:collapse;font-size:12px;">
-                                <thead>
-                                    <tr style="border-bottom:2px solid #e2e8f0;">
-                                        <th style="text-align:left;padding:6px 4px;color:#64748b;">Customer</th>
-                                        <th style="text-align:right;padding:6px 4px;color:#64748b;">Total</th>
-                                        <th style="text-align:center;padding:6px 4px;color:#64748b;">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                <?php foreach ( $recent_carts as $cart ) :
-                                    if ( $cart['status'] === 'recovered' ) {
-                                        $status_color = '#10b981';
-                                    } elseif ( $cart['status'] === 'synced' ) {
-                                        $status_color = '#3b82f6';
-                                    } else {
-                                        $status_color = '#f59e0b';
-                                    }
-                                    $display_name = $cart['email'] ?: substr( $cart['session_id'], 0, 12 ) . '...';
-                                ?>
-                                    <tr style="border-bottom:1px solid #f1f5f9;">
-                                        <td style="padding:7px 4px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?php echo esc_attr( $cart['email'] ?? '' ); ?>">
-                                            <?php echo esc_html( $display_name ); ?>
-                                        </td>
-                                        <td style="padding:7px 4px;text-align:right;font-weight:600;">
-                                            <?php echo wc_price( $cart['cart_total'] ); ?>
-                                        </td>
-                                        <td style="padding:7px 4px;text-align:center;">
-                                            <span style="background:<?php echo esc_attr( $status_color ); ?>22;color:<?php echo esc_attr( $status_color ); ?>;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">
-                                                <?php echo esc_html( ucfirst( $cart['status'] ) ); ?>
-                                            </span>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
-                            </table>
+                <!-- Recent carts table -->
+                <div class="ab-card">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+                        <h3 class="ab-card-title" style="margin:0;">Recent Carts</h3>
+                        <?php if ( ! empty( $s['api_url'] ) ) : ?>
+                        <a href="<?php echo esc_url( rtrim( $s['api_url'], '/' ) ); ?>" target="_blank" style="font-size:12px;color:#6366f1;text-decoration:none;font-weight:600;">View full dashboard &rarr;</a>
                         <?php endif; ?>
                     </div>
 
-                    <!-- How it works -->
-                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-top:16px;">
-                        <h3 style="margin:0 0 8px;font-size:13px;font-weight:700;">How it works</h3>
-                        <ol style="margin:0;padding-left:16px;color:#475569;font-size:12px;line-height:2.2;">
-                            <li>Cart changes → saved to WordPress DB instantly</li>
-                            <li>Also pushed to your app API in real-time</li>
-                            <li>Cron runs every 5 min → syncs any unsynced carts</li>
-                            <li>Email captured when shopper reaches checkout</li>
-                            <li>Order placed → cart marked as recovered</li>
-                        </ol>
-                    </div>
+                    <?php if ( empty( $recent_carts ) ) : ?>
+                        <div class="ab-empty">No carts captured yet.<br>A cart is captured when a customer fills all checkout fields.</div>
+                    <?php else : ?>
+                        <table class="ab-carts-table">
+                            <thead>
+                                <tr>
+                                    <th>Customer</th>
+                                    <th>Phone</th>
+                                    <th>Cart Total</th>
+                                    <th>Last Activity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ( $recent_carts as $cart ) :
+                                $badge_class = 'ab-badge-' . ( in_array( $cart['status'], ['pending','synced','recovered'] ) ? $cart['status'] : 'pending' );
+                                $name = $cart['name'] ?: $cart['email'];
+                                $name = $name ?: ( substr( $cart['session_id'], 0, 10 ) . '…' );
+                            ?>
+                                <tr>
+                                    <td>
+                                        <div style="font-weight:600;color:#0f172a;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo esc_html( $name ); ?></div>
+                                        <?php if ( $cart['email'] ) : ?><div style="font-size:11px;color:#94a3b8;"><?php echo esc_html( $cart['email'] ); ?></div><?php endif; ?>
+                                    </td>
+                                    <td style="color:#475569;"><?php echo esc_html( $cart['phone'] ?? '—' ); ?></td>
+                                    <td style="font-weight:700;"><?php echo wc_price( $cart['cart_total'] ); ?></td>
+                                    <td style="color:#94a3b8;font-size:12px;"><?php echo esc_html( $cart['last_activity'] ?? '—' ); ?></td>
+                                    <td><span class="ab-badge <?php echo $badge_class; ?>"><?php echo esc_html( ucfirst( $cart['status'] ) ); ?></span></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
                 </div>
 
-            </div>
+            <?php else : ?>
+
+                <!-- Settings tab -->
+                <div class="ab-settings-grid">
+
+                    <!-- Left: connection form -->
+                    <div>
+                        <div class="ab-card">
+                            <h3 class="ab-card-title">Connection Settings</h3>
+                            <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                                <?php wp_nonce_field( 'ab_save_settings' ); ?>
+                                <input type="hidden" name="action" value="ab_save">
+
+                                <?php
+                                $fields = [
+                                    'api_url'    => [ 'API URL',    'url',      'https://your-api.up.railway.app',  'Your Abandonment Buddy API base URL' ],
+                                    'store_id'   => [ 'Store ID',   'text',     'cmq3bxx...',                       'Found in your dashboard under store settings' ],
+                                    'api_key'    => [ 'API Key',    'text',     'ck_...',                           '' ],
+                                    'api_secret' => [ 'API Secret', 'password', 'cs_...',                           '' ],
+                                ];
+                                foreach ( $fields as $name => [ $label, $type, $placeholder, $hint ] ) : ?>
+                                <div class="ab-field">
+                                    <label class="ab-label" for="ab_<?php echo esc_attr( $name ); ?>"><?php echo esc_html( $label ); ?></label>
+                                    <input class="ab-input" type="<?php echo esc_attr( $type ); ?>"
+                                           id="ab_<?php echo esc_attr( $name ); ?>"
+                                           name="<?php echo esc_attr( $name ); ?>"
+                                           value="<?php echo esc_attr( $s[ $name ] ?? '' ); ?>"
+                                           placeholder="<?php echo esc_attr( $placeholder ); ?>">
+                                    <?php if ( $hint ) : ?><p class="ab-hint"><?php echo esc_html( $hint ); ?></p><?php endif; ?>
+                                </div>
+                                <?php endforeach; ?>
+
+                                <div class="ab-row" style="margin-top:20px;">
+                                    <button type="submit" class="ab-btn-secondary">Save Settings</button>
+                                </div>
+                            </form>
+
+                            <hr class="ab-divider">
+
+                            <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                                <?php wp_nonce_field( 'ab_connect' ); ?>
+                                <input type="hidden" name="action"     value="ab_connect">
+                                <input type="hidden" name="api_url"    value="<?php echo esc_attr( $s['api_url']    ?? '' ); ?>">
+                                <input type="hidden" name="store_id"   value="<?php echo esc_attr( $s['store_id']   ?? '' ); ?>">
+                                <input type="hidden" name="api_key"    value="<?php echo esc_attr( $s['api_key']    ?? '' ); ?>">
+                                <input type="hidden" name="api_secret" value="<?php echo esc_attr( $s['api_secret'] ?? '' ); ?>">
+                                <button type="submit" class="ab-btn-primary" style="width:100%;">Save &amp; Connect to Abandonment Buddy</button>
+                                <p class="ab-hint" style="text-align:center;margin-top:8px;">Verifies credentials and activates live cart tracking</p>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Right: info + tools -->
+                    <div>
+                        <!-- Connection status -->
+                        <div class="ab-card">
+                            <h3 class="ab-card-title">Connection Status</h3>
+                            <?php if ( $is_connected ) : ?>
+                                <div style="display:flex;flex-direction:column;gap:10px;">
+                                    <div style="display:flex;justify-content:space-between;font-size:13px;">
+                                        <span style="color:#64748b;font-weight:600;">Store ID</span>
+                                        <code style="font-size:12px;"><?php echo esc_html( $s['store_id'] ?? '' ); ?></code>
+                                    </div>
+                                    <?php if ( ! empty( $s['connected_at'] ) ) : ?>
+                                    <div style="display:flex;justify-content:space-between;font-size:13px;">
+                                        <span style="color:#64748b;font-weight:600;">Connected since</span>
+                                        <span><?php echo esc_html( $s['connected_at'] ); ?></span>
+                                    </div>
+                                    <?php endif; ?>
+                                    <div style="display:flex;justify-content:space-between;font-size:13px;">
+                                        <span style="color:#64748b;font-weight:600;">Plugin version</span>
+                                        <span>v<?php echo AB_VERSION; ?></span>
+                                    </div>
+                                </div>
+                            <?php else : ?>
+                                <p style="color:#94a3b8;font-size:13px;margin:0;">Not connected. Fill in your credentials on the left and click <strong>Save &amp; Connect</strong>.</p>
+                            <?php endif; ?>
+                        </div>
+
+                        <!-- Tools -->
+                        <div class="ab-card">
+                            <h3 class="ab-card-title">Tools</h3>
+
+                            <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-bottom:10px;">
+                                <?php wp_nonce_field( 'ab_check_updates' ); ?>
+                                <input type="hidden" name="action" value="ab_check_updates">
+                                <button type="submit" class="ab-btn-ghost">Check for plugin updates</button>
+                            </form>
+
+                            <?php if ( ! empty( $duplicates ) ) : ?>
+                            <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                                <?php wp_nonce_field( 'ab_cleanup' ); ?>
+                                <input type="hidden" name="action" value="ab_cleanup">
+                                <button type="submit" class="ab-btn-ghost" style="color:#dc2626;border-color:#fecaca;" onclick="return confirm('Delete old plugin folders?\n\n<?php echo esc_js( implode( '\n', $duplicates ) ); ?>')">Delete <?php echo count( $duplicates ); ?> duplicate install(s)</button>
+                            </form>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                </div>
+
+            <?php endif; ?>
+
         </div>
         <?php
     }
