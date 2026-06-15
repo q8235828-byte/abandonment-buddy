@@ -26,19 +26,21 @@ function readChangelog(): string {
 @Controller('plugin')
 export class PluginController {
 
+  // The zip is committed to the repo — serve directly from GitHub raw CDN.
+  // No Vercel URL or WEB_URL env var needed.
+  private static readonly ZIP_URL =
+    'https://raw.githubusercontent.com/q8235828-byte/abandonment-buddy/main/apps/web/public/abandonment-buddy.zip';
+
   @Get('info')
   getInfo() {
     const version   = readPluginVersion();
     const changelog = readChangelog();
-    // Use API_URL env var (the Railway public URL) so download_url is always correct.
-    // /plugin/download redirects to Vercel — no WEB_URL needed.
-    const apiUrl    = (process.env.API_URL || 'https://abandonment-cart.up.railway.app').replace(/\/$/, '');
 
     return {
       name:          'Abandonment Buddy for WooCommerce',
       slug:          'abandonment-buddy',
       version,
-      download_url:  `${apiUrl}/plugin/download`,
+      download_url:  PluginController.ZIP_URL,
       changelog,
       requires:      '5.8',
       requires_php:  '7.0',
@@ -51,7 +53,6 @@ export class PluginController {
 
   @Get('download')
   download(@Res() res: Response) {
-    const webUrl = (process.env.WEB_URL || 'https://abandonment-buddy.vercel.app').replace(/\/$/, '');
-    res.redirect(302, `${webUrl}/abandonment-buddy.zip`);
+    res.redirect(302, PluginController.ZIP_URL);
   }
 }
