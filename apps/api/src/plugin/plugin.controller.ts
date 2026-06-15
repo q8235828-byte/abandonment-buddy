@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { ZipArchive } from 'archiver';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { PrismaService } from '../prisma/prisma.service';
 
 const PLUGIN_DIR  = path.resolve(__dirname, '../../../../plugins/abandonment-buddy');
 const PLUGIN_FILE = path.join(PLUGIN_DIR, 'abandonment-buddy.php');
@@ -26,6 +27,7 @@ function readChangelog(): string {
 
 @Controller('plugin')
 export class PluginController {
+  constructor(private readonly prisma: PrismaService) {}
 
   private baseUrl(req: Request): string {
     if (process.env.API_URL) return process.env.API_URL.replace(/\/$/, '');
@@ -71,5 +73,51 @@ export class PluginController {
     archive.pipe(res);
     archive.directory(PLUGIN_DIR, 'abandonment-buddy');
     void archive.finalize();
+  }
+
+  @Get('stats')
+  async getStats(@Req() req: Request) {
+    const apiKey  = req.headers['x-ab-api-key']  as string;
+    const storeId = req.headers['x-ab-store-id'] as string;
+
+    if (!apiKey || !storeId) {
+      return { error: 'Missing credentials' };
+    }
+
+    const store = await this.prisma.store.findFirst({
+      where: { id: storeId, apiKey },
+      include: { abandonedOrders: true },
+    });
+
+    if (!store) {
+      return { error: 'Invalid credentials' };
+    }
+
+    const orders    = store.abandonedOrders;
+    const recovered = orders.filter((o) => o.status === 'RECOVERED');
+    const revenue   = recovered.reduce((s, o) => s + Number(o.cartValue ?? 0), 0);
+
+    const emailSent    = orders.filter((o) => o.emailSentAt).length;
+    const whatsappSent = orders.filter((o) => (o as any).whatsappSentAt).length;
+    const smsSent      = orders.filter((o) => (o as any).smsSentAt).length;
+
+    const emailRecovered    = orders.filter((o) => o.status === 'RECOVERED' && (o as any).recoveredBy === 'EMAIL').length;
+    const whatsappRecovered = orders.filter((o) => o.status === 'RECOVERED' && (o as any).recoveredBy === 'WHATSAPP').length;
+    const smsRecovered      = orders.filter((o) => o.status === 'RECOVERED' && (o as any).recoveredBy === 'SMS').length;
+
+    return {
+      totalCarts:       orders.length,
+      abandonedCarts:   orders.filter((o) => o.isAbandoned).length,
+      recoveredCarts:   recovered.length,
+      revenueRecovered: revenue,
+      recoveryRate:     orders.length ? Math.round((recovered.length / orders.length) * 100) : 0,
+      emailSent,
+      whatsappSent,
+      smsSent,
+      messagesSent:     emailSent + whatsappSent + smsSent,
+      emailRecovered,
+      whatsappRecovered,
+      smsRecovered,
+    };
   }
 }

@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.4
+Stable tag: 1.5.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,11 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.5 =
+* Dashboard stats now fetched live from Abandonment Buddy API (total carts, abandoned, messages sent by channel, recovered, revenue, recovery rate)
+* Falls back to local WordPress DB stats if API is unreachable
+* Green/amber source indicator shows whether stats are live or local
 
 = 1.5.4 =
 * Complete admin page redesign: tabbed Dashboard + Settings layout

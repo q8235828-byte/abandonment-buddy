@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.4
+ * Version:     1.5.5
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.4' );
+define( 'AB_VERSION',    '1.5.5' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -614,19 +614,57 @@ class Abandonment_Buddy {
             }
         }
 
-        // Compute stats from local DB
-        $all_carts       = AB_DB::get_all_recent( 5000 );
-        $stat_total      = count( $all_carts );
-        $stat_abandoned  = 0; $stat_synced = 0; $stat_recovered = 0;
-        $val_abandoned   = 0; $val_recovered = 0;
-        foreach ( $all_carts as $c ) {
-            if ( $c['status'] === 'pending'   ) { $stat_abandoned++;  $val_abandoned  += (float) $c['cart_total']; }
-            if ( $c['status'] === 'synced'    ) { $stat_synced++;                                                  }
-            if ( $c['status'] === 'recovered' ) { $stat_recovered++;  $val_recovered  += (float) $c['cart_total']; }
+        // Fetch live stats from API (authenticated by API key + store ID)
+        $api_stats    = null;
+        $stats_source = 'local';
+        if ( ! empty( $s['api_url'] ) && ! empty( $s['api_key'] ) && ! empty( $s['store_id'] ) ) {
+            $resp = wp_remote_get(
+                rtrim( $s['api_url'], '/' ) . '/plugin/stats',
+                [
+                    'timeout' => 8,
+                    'headers' => [
+                        'X-AB-API-Key'  => $s['api_key'],
+                        'X-AB-Store-ID' => $s['store_id'],
+                    ],
+                ]
+            );
+            if ( ! is_wp_error( $resp ) && 200 === (int) wp_remote_retrieve_response_code( $resp ) ) {
+                $body = json_decode( wp_remote_retrieve_body( $resp ), true );
+                if ( ! empty( $body ) && empty( $body['error'] ) ) {
+                    $api_stats    = $body;
+                    $stats_source = 'api';
+                }
+            }
         }
-        $recovery_rate = $stat_total > 0 ? round( ( $stat_recovered / $stat_total ) * 100 ) : 0;
-        $recent_carts  = array_slice( $all_carts, 0, 20 );
-        $is_connected  = $connected || $just_connected;
+
+        // Fall back to local DB stats if API unreachable
+        $all_carts = AB_DB::get_all_recent( 5000 );
+        if ( $api_stats ) {
+            $stat_total      = $api_stats['totalCarts']       ?? 0;
+            $stat_abandoned  = $api_stats['abandonedCarts']   ?? 0;
+            $stat_synced     = $api_stats['messagesSent']     ?? 0;
+            $stat_recovered  = $api_stats['recoveredCarts']   ?? 0;
+            $val_abandoned   = 0;
+            $val_recovered   = $api_stats['revenueRecovered'] ?? 0;
+            $recovery_rate   = $api_stats['recoveryRate']     ?? 0;
+            $email_sent      = $api_stats['emailSent']        ?? 0;
+            $whatsapp_sent   = $api_stats['whatsappSent']     ?? 0;
+            $sms_sent        = $api_stats['smsSent']          ?? 0;
+        } else {
+            $stat_total = count( $all_carts );
+            $stat_abandoned = 0; $stat_synced = 0; $stat_recovered = 0;
+            $val_abandoned = 0; $val_recovered = 0;
+            foreach ( $all_carts as $c ) {
+                if ( $c['status'] === 'pending'   ) { $stat_abandoned++; $val_abandoned += (float) $c['cart_total']; }
+                if ( $c['status'] === 'synced'    ) { $stat_synced++;                                                }
+                if ( $c['status'] === 'recovered' ) { $stat_recovered++; $val_recovered += (float) $c['cart_total']; }
+            }
+            $recovery_rate = $stat_total > 0 ? round( ( $stat_recovered / $stat_total ) * 100 ) : 0;
+            $email_sent = 0; $whatsapp_sent = 0; $sms_sent = 0;
+        }
+
+        $recent_carts = array_slice( $all_carts, 0, 20 );
+        $is_connected = $connected || $just_connected;
         ?>
 
         <style>
@@ -728,27 +766,44 @@ class Abandonment_Buddy {
 
             <?php if ( $active_tab === 'dashboard' ) : ?>
 
+                <!-- Stats source badge -->
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <span style="font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">
+                        <?php if ( $stats_source === 'api' ) : ?>
+                            <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:6px;height:6px;background:#22c55e;border-radius:50%;display:inline-block;"></span> Live data from Abandonment Buddy</span>
+                        <?php else : ?>
+                            <span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:6px;height:6px;background:#f59e0b;border-radius:50%;display:inline-block;"></span> Local data (connect to see live stats)</span>
+                        <?php endif; ?>
+                    </span>
+                </div>
+
                 <!-- Stat cards -->
                 <div class="ab-stat-grid">
                     <div class="ab-stat-card">
-                        <div class="ab-stat-label">Total Captured</div>
-                        <div class="ab-stat-value"><?php echo $stat_total; ?></div>
-                        <div class="ab-stat-sub">at checkout</div>
+                        <div class="ab-stat-label">Total Carts</div>
+                        <div class="ab-stat-value"><?php echo number_format( $stat_total ); ?></div>
+                        <div class="ab-stat-sub">captured at checkout</div>
                     </div>
                     <div class="ab-stat-card amber">
                         <div class="ab-stat-label">Abandoned</div>
-                        <div class="ab-stat-value"><?php echo $stat_abandoned; ?></div>
-                        <div class="ab-stat-sub"><?php echo wc_price( $val_abandoned ); ?> at risk</div>
+                        <div class="ab-stat-value"><?php echo number_format( $stat_abandoned ); ?></div>
+                        <div class="ab-stat-sub"><?php echo $val_abandoned > 0 ? wc_price( $val_abandoned ) . ' at risk' : 'awaiting recovery'; ?></div>
                     </div>
                     <div class="ab-stat-card blue">
-                        <div class="ab-stat-label">Synced to App</div>
-                        <div class="ab-stat-value"><?php echo $stat_synced; ?></div>
-                        <div class="ab-stat-sub">sent to campaigns</div>
+                        <div class="ab-stat-label">Messages Sent</div>
+                        <div class="ab-stat-value"><?php echo number_format( $stat_synced ); ?></div>
+                        <div class="ab-stat-sub">
+                            <?php if ( $stats_source === 'api' ) : ?>
+                                <?php echo $email_sent; ?> email &middot; <?php echo $whatsapp_sent; ?> WhatsApp &middot; <?php echo $sms_sent; ?> SMS
+                            <?php else : ?>
+                                synced to campaigns
+                            <?php endif; ?>
+                        </div>
                     </div>
                     <div class="ab-stat-card green">
                         <div class="ab-stat-label">Recovered</div>
-                        <div class="ab-stat-value"><?php echo $stat_recovered; ?></div>
-                        <div class="ab-stat-sub"><?php echo wc_price( $val_recovered ); ?> recovered &middot; <?php echo $recovery_rate; ?>% rate</div>
+                        <div class="ab-stat-value"><?php echo number_format( $stat_recovered ); ?></div>
+                        <div class="ab-stat-sub"><?php echo wc_price( $val_recovered ); ?> &middot; <?php echo $recovery_rate; ?>% rate</div>
                     </div>
                 </div>
 
