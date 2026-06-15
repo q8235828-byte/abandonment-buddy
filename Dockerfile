@@ -33,6 +33,7 @@ COPY packages/database/prisma ./packages/database/prisma/
 RUN pnpm install --no-frozen-lockfile --prod
 
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY plugins ./plugins
 
 RUN pnpm --filter @abandonment-buddy/database db:generate || true
 
