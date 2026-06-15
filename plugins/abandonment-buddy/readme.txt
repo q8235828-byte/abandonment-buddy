@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.4.9
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,11 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.0 =
+* Auto-write must-use plugin on activation to set FS_METHOD=direct without needing wp-config.php access
+* Detect duplicate plugin installs in WP Admin and show one-click cleanup button
+* Dashboard download buttons now serve zip dynamically from API (always latest version)
 
 = 1.4.9 =
 * Test update flow: verify clean in-place upgrade with no duplicate plugin directories

@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.4.9
+ * Version:     1.5.0
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.4.9' );
+define( 'AB_VERSION',    '1.5.0' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -46,8 +46,18 @@ register_activation_hook( __FILE__, function () {
     if ( ! wp_next_scheduled( AB_CRON_HOOK ) ) {
         wp_schedule_event( time(), 'ab_every_5_min', AB_CRON_HOOK );
     }
-    // Force WordPress to re-check for plugin updates on next load.
     delete_site_transient( 'update_plugins' );
+
+    // Write a must-use plugin so FS_METHOD=direct is set before regular plugins
+    // load — this lets WordPress delete/replace plugin files without FTP prompts.
+    $mu_dir  = WP_CONTENT_DIR . '/mu-plugins';
+    $mu_file = $mu_dir . '/ab-fs-method.php';
+    if ( ! file_exists( $mu_file ) ) {
+        if ( ! is_dir( $mu_dir ) ) {
+            @mkdir( $mu_dir, 0755, true );
+        }
+        @file_put_contents( $mu_file, "<?php\n// Written by Abandonment Buddy — ensures WordPress can install/delete plugins without FTP.\nif ( ! defined( 'FS_METHOD' ) ) { define( 'FS_METHOD', 'direct' ); }\n" );
+    }
 } );
 
 register_deactivation_hook( __FILE__, function () {
@@ -211,6 +221,7 @@ class Abandonment_Buddy {
         add_action( 'admin_post_ab_save',           [ $this, 'handle_save' ] );
         add_action( 'admin_post_ab_connect',        [ $this, 'handle_connect' ] );
         add_action( 'admin_post_ab_check_updates',  [ $this, 'handle_check_updates' ] );
+        add_action( 'admin_post_ab_cleanup',        [ $this, 'handle_cleanup' ] );
 
         if ( empty( $this->settings['store_id'] ) || empty( $this->settings['webhook_secret'] ) ) {
             return;
@@ -500,6 +511,49 @@ class Abandonment_Buddy {
         exit;
     }
 
+    public function handle_cleanup() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Unauthorized' );
+        }
+        check_admin_referer( 'ab_cleanup' );
+
+        $current_dir = dirname( __FILE__ );
+        $plugins_dir = WP_PLUGIN_DIR;
+        $deleted     = 0;
+        $failed      = 0;
+
+        foreach ( glob( $plugins_dir . '/*/abandonment-buddy.php' ) as $file ) {
+            $dir = dirname( $file );
+            if ( $dir === $current_dir ) {
+                continue; // skip the currently active plugin
+            }
+            if ( self::delete_dir( $dir ) ) {
+                $deleted++;
+            } else {
+                $failed++;
+            }
+        }
+
+        $msg = $deleted > 0 ? "cleanup_ok={$deleted}" : 'cleanup_none';
+        if ( $failed > 0 ) {
+            $msg .= "&cleanup_failed={$failed}";
+        }
+        wp_redirect( admin_url( 'admin.php?page=abandonment-buddy&' . $msg ) );
+        exit;
+    }
+
+    private static function delete_dir( $dir ) {
+        if ( ! is_dir( $dir ) ) {
+            return true;
+        }
+        $files = array_diff( scandir( $dir ), [ '.', '..' ] );
+        foreach ( $files as $file ) {
+            $path = $dir . '/' . $file;
+            is_dir( $path ) ? self::delete_dir( $path ) : @unlink( $path );
+        }
+        return @rmdir( $dir );
+    }
+
     public function handle_save() {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( 'Unauthorized' );
@@ -582,6 +636,17 @@ class Abandonment_Buddy {
         $saved          = isset( $_GET['saved'] );
         $just_connected = isset( $_GET['connected'] );
         $error          = isset( $_GET['error'] ) ? urldecode( $_GET['error'] ) : '';
+        $cleanup_ok     = isset( $_GET['cleanup_ok'] )     ? (int) $_GET['cleanup_ok']     : 0;
+        $cleanup_failed = isset( $_GET['cleanup_failed'] ) ? (int) $_GET['cleanup_failed'] : 0;
+        $cleanup_none   = isset( $_GET['cleanup_none'] );
+
+        // Detect duplicate installs of this plugin
+        $duplicates = [];
+        foreach ( glob( WP_PLUGIN_DIR . '/*/abandonment-buddy.php' ) as $file ) {
+            if ( dirname( $file ) !== dirname( __FILE__ ) ) {
+                $duplicates[] = basename( dirname( $file ) );
+            }
+        }
 
         // Show local cart stats
         $recent_carts = AB_DB::get_all_recent( 10 );
@@ -599,6 +664,29 @@ class Abandonment_Buddy {
 
             <?php if ( $just_connected ) : ?>
                 <div class="notice notice-success is-dismissible"><p>✅ Store connected successfully! Cart tracking is now active.</p></div>
+            <?php endif; ?>
+
+            <?php if ( $cleanup_ok > 0 ) : ?>
+                <div class="notice notice-success is-dismissible"><p>✅ Removed <?php echo $cleanup_ok; ?> duplicate plugin folder(s) successfully.</p></div>
+            <?php elseif ( $cleanup_none ) : ?>
+                <div class="notice notice-info is-dismissible"><p>ℹ️ No duplicate plugin installations found.</p></div>
+            <?php endif; ?>
+
+            <?php if ( $cleanup_failed > 0 ) : ?>
+                <div class="notice notice-error is-dismissible"><p>❌ Could not delete <?php echo $cleanup_failed; ?> folder(s) — your server may need FTP access. Contact your host to delete old <code>abandonment-buddy</code> folders from <code>/wp-content/plugins/</code>.</p></div>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $duplicates ) ) : ?>
+                <div class="notice notice-warning" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+                    <p style="margin:0;">⚠️ <strong><?php echo count( $duplicates ); ?> duplicate plugin folder(s) detected:</strong> <?php echo esc_html( implode( ', ', $duplicates ) ); ?>. These are old versions that should be removed.</p>
+                    <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin:0;">
+                        <?php wp_nonce_field( 'ab_cleanup' ); ?>
+                        <input type="hidden" name="action" value="ab_cleanup">
+                        <button type="submit" class="button button-primary" onclick="return confirm('Delete these old plugin folders?\n\n<?php echo esc_js( implode( '\n', $duplicates ) ); ?>')">
+                            🗑️ Delete duplicate installs
+                        </button>
+                    </form>
+                </div>
             <?php endif; ?>
 
             <?php if ( $error ) : ?>
