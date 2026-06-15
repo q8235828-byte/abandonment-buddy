@@ -28,21 +28,20 @@ export class PluginController {
 
   @Get('info')
   getInfo() {
-    const version     = readPluginVersion();
-    const changelog   = readChangelog();
-    // Plugin zip is served as a static file from the Vercel frontend.
-    // WEB_URL should be set to the Vercel deployment URL (no trailing slash).
-    const webUrl      = (process.env.WEB_URL || 'https://abandonment-buddy.vercel.app').replace(/\/$/, '');
-    const downloadUrl = `${webUrl}/abandonment-buddy.zip`;
+    const version   = readPluginVersion();
+    const changelog = readChangelog();
+    // Use API_URL env var (the Railway public URL) so download_url is always correct.
+    // /plugin/download redirects to Vercel — no WEB_URL needed.
+    const apiUrl    = (process.env.API_URL || 'https://abandonment-cart.up.railway.app').replace(/\/$/, '');
 
     return {
       name:          'Abandonment Buddy for WooCommerce',
       slug:          'abandonment-buddy',
       version,
-      download_url:  downloadUrl,
+      download_url:  `${apiUrl}/plugin/download`,
       changelog,
       requires:      '5.8',
-      requires_php:  '7.4',
+      requires_php:  '7.0',
       tested_up_to:  '6.7',
       last_updated:  new Date().toISOString().slice(0, 10),
       author:        'Abandonment Buddy',
@@ -52,7 +51,6 @@ export class PluginController {
 
   @Get('download')
   download(@Res() res: Response) {
-    // Redirect to the static file served by Vercel — no file system access needed.
     const webUrl = (process.env.WEB_URL || 'https://abandonment-buddy.vercel.app').replace(/\/$/, '');
     res.redirect(302, `${webUrl}/abandonment-buddy.zip`);
   }
