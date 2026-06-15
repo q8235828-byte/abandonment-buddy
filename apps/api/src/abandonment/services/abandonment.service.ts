@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 
 import { PrismaService } from '../../prisma/prisma.service';
@@ -84,5 +84,14 @@ export class AbandonmentService {
       orderBy: { createdAt: 'desc' },
       include: { store: true },
     });
+  }
+
+  async getOrderById(orderId: string, userId: string) {
+    const order = await this.prisma.abandonedOrder.findFirst({
+      where:   { id: orderId, store: { ownerId: userId } },
+      include: { store: { include: { campaigns: { take: 1 } } } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    return order;
   }
 }

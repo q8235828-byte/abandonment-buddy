@@ -162,6 +162,16 @@ model AbandonedOrder {
   recoveredBy     String?   // 'EMAIL' | 'WHATSAPP' | 'SMS'
   recoveredByStep Int?      // 1, 2, or 3
 
+  // Visitor intelligence (captured on open/click)
+  customerIp      String?
+  customerCountry String?
+  customerCity    String?
+  customerRegion  String?
+  customerIsp     String?
+  customerDevice  String?   // mobile | tablet | desktop
+  customerBrowser String?
+  customerOs      String?
+
   storeId String
   store   Store  @relation(fields: [storeId], references: [id])
 

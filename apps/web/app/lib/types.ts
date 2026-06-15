@@ -56,6 +56,15 @@ export type AbandonedOrder = {
   emailClickedAt?: string | null;
   recoveredBy?: 'EMAIL' | 'WHATSAPP' | 'SMS' | null;
   recoveredByStep?: number | null;
+  // Visitor intelligence
+  customerIp?: string | null;
+  customerCountry?: string | null;
+  customerCity?: string | null;
+  customerRegion?: string | null;
+  customerIsp?: string | null;
+  customerDevice?: string | null;
+  customerBrowser?: string | null;
+  customerOs?: string | null;
   createdAt: string;
   updatedAt: string;
   store?: Store;

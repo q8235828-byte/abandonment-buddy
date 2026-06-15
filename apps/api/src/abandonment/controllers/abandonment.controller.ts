@@ -1,4 +1,4 @@
-import { Controller, Post, Get, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Param, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AbandonmentService } from '../services/abandonment.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -19,5 +19,10 @@ export class AbandonmentController {
   @Get('orders')
   getOrders(@CurrentUser() user: any) {
     return this.abandonmentService.getOrders(user.userId);
+  }
+
+  @Get('orders/:id')
+  getOrder(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.abandonmentService.getOrderById(id, user.userId);
   }
 }
