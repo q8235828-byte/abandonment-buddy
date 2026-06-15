@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.2
+Stable tag: 1.5.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,10 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.3 =
+* Fix: remove plugin from no_update list when injecting update so WordPress doesn't suppress the badge
+* Fix: add hourly admin_init check that clears update transient the moment a new version is detected — no deactivate/reactivate needed
 
 = 1.5.2 =
 * Fix: update notification now shows immediately on the Plugins page without waiting for WordPress 12-hour cache to expire

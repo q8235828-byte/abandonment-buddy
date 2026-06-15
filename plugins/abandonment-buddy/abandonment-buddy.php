@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.2
+ * Version:     1.5.3
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.2' );
+define( 'AB_VERSION',    '1.5.3' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.1' );
@@ -828,11 +828,29 @@ class AB_Updater {
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'inject_update' ] );
         add_filter( 'site_transient_update_plugins',         [ $this, 'inject_update' ] );
         add_filter( 'plugins_api',                           [ $this, 'plugin_info' ], 10, 3 );
+        add_action( 'admin_init',                            [ $this, 'maybe_force_update_check' ] );
+    }
+
+    /**
+     * Once per hour, check if a newer version exists and if so clear the
+     * WordPress update transient so the badge appears on the very next
+     * page load without needing a deactivate/reactivate cycle.
+     */
+    public function maybe_force_update_check() {
+        if ( get_transient( 'ab_update_check' ) ) {
+            return;
+        }
+        set_transient( 'ab_update_check', 1, HOUR_IN_SECONDS );
+
+        $remote = $this->fetch_remote();
+        if ( $remote && version_compare( $remote->version, $this->version, '>' ) ) {
+            delete_site_transient( 'update_plugins' );
+        }
     }
 
     /** Called by WordPress during its update check — inject our version if newer. */
     public function inject_update( $transient ) {
-        if ( empty( $transient->checked ) ) {
+        if ( ! is_object( $transient ) || empty( $transient->checked ) ) {
             return $transient;
         }
 
@@ -854,6 +872,9 @@ class AB_Updater {
             'tested'      => $remote->tested_up_to ?? '6.7',
             'requires_php'=> $remote->requires_php ?? '7.4',
         ];
+
+        // Remove from no_update so WordPress doesn't suppress the badge
+        unset( $transient->no_update[ $this->slug ] );
 
         return $transient;
     }
