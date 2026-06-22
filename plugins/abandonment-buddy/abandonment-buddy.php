@@ -739,6 +739,7 @@ class Abandonment_Buddy {
             wp_die( 'Unauthorized' );
         }
         check_admin_referer( 'ab_check_updates' );
+        delete_transient( 'ab_update_check' );      // allow fresh API fetch regardless of 1h cache
         delete_site_transient( 'update_plugins' );
         wp_update_plugins();
         wp_redirect( admin_url( 'update-core.php' ) );
