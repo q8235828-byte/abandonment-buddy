@@ -37,6 +37,6 @@ COPY plugins ./plugins
 
 RUN pnpm --filter @abandonment-buddy/database db:generate || true
 
-EXPOSE 3001
+EXPOSE ${PORT:-3001}
 
 CMD ["sh", "-c", "npx prisma migrate deploy --schema packages/database/prisma/schema.prisma && node apps/api/dist/main"]
