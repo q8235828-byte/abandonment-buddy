@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: abandonment-buddy-api
+    runtime: docker
+    plan: free          # never upgrade to a paid tier automatically
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        sync: false     # you paste this in the Render dashboard
+      - key: DIRECT_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: API_URL
+        sync: false     # set to https://<your-service>.onrender.com after first deploy
