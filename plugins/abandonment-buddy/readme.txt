@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.8
+Stable tag: 1.5.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,12 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.5.9 =
+* Recovery emails via wp_mail() now enabled by default when the store is connected — no manual opt-in required
+* First connect sets sensible email defaults (1h delay for email 1, 24h for email 2) automatically
+* Settings UI shows "Enable follow-up email sequence" as checked by default for existing stores
+* Follow-up emails can still be disabled via the toggle in Settings → Follow-up Email Sequence
 
 = 1.5.8 =
 * Fix: cart total in email now always equals sum of item totals (was showing pre-tax subtotal vs tax-inclusive item totals)

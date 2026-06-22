@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.8
+ * Version:     1.5.9
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.8' );
+define( 'AB_VERSION',    '1.5.9' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.3' );
@@ -505,7 +505,12 @@ class Abandonment_Buddy {
     }
 
     private function send_followup_emails() {
-        if ( empty( $this->settings['followup_enabled'] ) ) {
+        // Enabled by default when connected; only skip when explicitly set to false in settings.
+        if ( array_key_exists( 'followup_enabled', $this->settings ) && empty( $this->settings['followup_enabled'] ) ) {
+            return;
+        }
+        // Nothing to do without a connected store.
+        if ( empty( $this->settings['store_id'] ) || empty( $this->settings['webhook_secret'] ) ) {
             return;
         }
 
@@ -860,6 +865,11 @@ class Abandonment_Buddy {
         $settings['webhook_secret'] = $body['webhookSecret'];
         $settings['connected']      = true;
         $settings['connected_at']   = current_time( 'mysql' );
+
+        // Set email defaults on first connect so wp_mail() recovery emails work out of the box.
+        if ( ! isset( $settings['followup_delay'] ) )   $settings['followup_delay']   = 60;  // 1h after abandonment
+        if ( ! isset( $settings['followup_delay_2'] ) ) $settings['followup_delay_2'] = 1440; // 24h (disabled until saved)
+        if ( ! isset( $settings['followup_delay_3'] ) ) $settings['followup_delay_3'] = 0;    // off
 
         update_option( AB_OPTION_KEY, $settings );
 
@@ -1255,7 +1265,7 @@ class Abandonment_Buddy {
                         <!-- Enable toggle -->
                         <div class="ab-field" style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:20px;">
                             <label class="ab-toggle" style="position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0;">
-                                <input type="checkbox" name="followup_enabled" value="1" <?php checked( ! empty( $s['followup_enabled'] ) ); ?> style="opacity:0;width:0;height:0;position:absolute;">
+                                <input type="checkbox" name="followup_enabled" value="1" <?php checked( ! array_key_exists( 'followup_enabled', $s ) || ! empty( $s['followup_enabled'] ) ); ?> style="opacity:0;width:0;height:0;position:absolute;">
                                 <span class="ab-toggle-slider" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#cbd5e1;border-radius:24px;transition:.3s;"></span>
                             </label>
                             <div>
