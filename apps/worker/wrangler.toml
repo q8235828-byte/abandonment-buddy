@@ -1,0 +1,8 @@
+name = "abandonment-buddy-proxy"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# Set API_ORIGIN via the Cloudflare dashboard or: wrangler secret put API_ORIGIN
+# Example: https://your-app.up.railway.app
+[vars]
+API_ORIGIN = ""
