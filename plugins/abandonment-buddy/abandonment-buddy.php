@@ -1357,20 +1357,20 @@ class Abandonment_Buddy {
 
 // ── Auto-updater ─────────────────────────────────────────────────────────────
 // Hooks into WordPress's native update mechanism so "Update available" appears
-// in WP Admin whenever a new version is pushed to the Abandonment Buddy API.
+// in WP Admin whenever a new GitHub Release is published.
+
+define( 'AB_GITHUB_REPO', 'q8235828-byte/abandonment-buddy' );
 
 class AB_Updater {
 
-    private $slug;        // abandonment-buddy/abandonment-buddy.php
-    private $folder;      // abandonment-buddy
-    private $version;     // currently installed version
-    private $update_url;  // API base URL for version checks
+    private $slug;    // abandonment-buddy/abandonment-buddy.php
+    private $folder;  // abandonment-buddy
+    private $version; // currently installed version
 
-    public function __construct( $slug, $version, $update_url ) {
-        $this->slug       = $slug;
-        $this->folder     = dirname( $slug );
-        $this->version    = $version;
-        $this->update_url = rtrim( $update_url, '/' );
+    public function __construct( $slug, $version ) {
+        $this->slug    = $slug;
+        $this->folder  = dirname( $slug );
+        $this->version = $version;
 
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'inject_update' ] );
         add_filter( 'site_transient_update_plugins',         [ $this, 'inject_update' ] );
@@ -1455,28 +1455,58 @@ class AB_Updater {
         ];
     }
 
-    /** Fetch remote version info from the API (cached per request). */
+    /** Fetch latest release info from GitHub Releases (cached per request). */
     private function fetch_remote() {
         static $cache = null;
         if ( $cache !== null ) {
             return $cache === false ? null : $cache;
         }
 
-        $url = $this->update_url . '/plugin/info';
-
-        $response = wp_remote_get( $url, [
-            'timeout'    => 8,
-            'user-agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . get_bloginfo( 'url' ),
-        ] );
+        $response = wp_remote_get(
+            'https://api.github.com/repos/' . AB_GITHUB_REPO . '/releases/latest',
+            [
+                'timeout'    => 8,
+                'user-agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . get_bloginfo( 'url' ),
+                'headers'    => [ 'Accept' => 'application/vnd.github+json' ],
+            ]
+        );
 
         if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
             $cache = false;
             return null;
         }
 
-        $body = json_decode( wp_remote_retrieve_body( $response ) );
-        $cache = ( $body && ! empty( $body->version ) ) ? $body : false;
-        return $cache === false ? null : $cache;
+        $data = json_decode( wp_remote_retrieve_body( $response ) );
+        if ( ! $data || empty( $data->tag_name ) ) {
+            $cache = false;
+            return null;
+        }
+
+        // Find the plugin ZIP asset; fall back to GitHub's auto-generated zipball.
+        $download_url = '';
+        if ( ! empty( $data->assets ) ) {
+            foreach ( $data->assets as $asset ) {
+                if ( substr( $asset->name, -4 ) === '.zip' ) {
+                    $download_url = $asset->browser_download_url;
+                    break;
+                }
+            }
+        }
+        if ( ! $download_url && ! empty( $data->zipball_url ) ) {
+            $download_url = $data->zipball_url;
+        }
+
+        $cache = (object) [
+            'version'      => ltrim( $data->tag_name, 'v' ),
+            'download_url' => $download_url,
+            'requires'     => '5.8',
+            'requires_php' => '7.4',
+            'last_updated' => ! empty( $data->published_at ) ? gmdate( 'Y-m-d', strtotime( $data->published_at ) ) : '',
+            'homepage'     => 'https://abandonmentbuddy.com',
+            'changelog'    => ! empty( $data->body ) ? $data->body : '',
+        ];
+
+        return $cache;
     }
 }
 
@@ -1485,11 +1515,5 @@ class AB_Updater {
 add_action( 'plugins_loaded', function () {
     $instance = Abandonment_Buddy::get_instance();
 
-    // Boot auto-updater using the stored API URL (falls back to official URL).
-    $settings   = (array) get_option( AB_OPTION_KEY, [] );
-    $update_url = ! empty( $settings['api_url'] )
-        ? $settings['api_url']
-        : 'https://api.abandonmentbuddy.com';
-
-    new AB_Updater( plugin_basename( __FILE__ ), AB_VERSION, $update_url );
+    new AB_Updater( plugin_basename( __FILE__ ), AB_VERSION );
 } );
