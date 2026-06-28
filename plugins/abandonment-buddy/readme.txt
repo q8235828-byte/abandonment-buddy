@@ -4,7 +4,7 @@ Tags: woocommerce, abandoned cart, cart recovery, email recovery, whatsapp
 Requires at least: 5.8
 Tested up to: 6.7
 Requires PHP: 7.4
-Stable tag: 1.5.9
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -30,6 +30,13 @@ Abandonment Buddy connects your WooCommerce store to the Abandonment Buddy SaaS 
 5. Click "Save & Connect"
 
 == Changelog ==
+
+= 1.6.0 =
+* SMTP email delivery: configure any SMTP provider (Gmail, Outlook, custom) from the Settings tab
+* All 3 recovery email steps now route through your SMTP credentials for reliable inbox delivery
+* New SMTP settings card: host, port, encryption, username, password with status indicator
+* Send Test Email button in Settings tab — verify delivery before going live
+* Auto-updater now fetches updates directly from GitHub Releases (no backend required)
 
 = 1.5.9 =
 * Recovery emails via wp_mail() now enabled by default when the store is connected — no manual opt-in required

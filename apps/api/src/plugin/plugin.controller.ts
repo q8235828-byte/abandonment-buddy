@@ -48,7 +48,7 @@ export class PluginController {
       tested_up_to:  '6.7',
       last_updated:  new Date().toISOString().slice(0, 10),
       author:        'Abandonment Buddy',
-      homepage:      'https://abandonmentbuddy.com',
+      homepage:      'https://knowlity.org',
     };
   }
 
