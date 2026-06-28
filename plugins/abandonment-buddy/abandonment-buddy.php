@@ -29,6 +29,8 @@ define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.3' );
 
+require_once __DIR__ . '/rest-api.php';
+
 // ── Custom cron interval ─────────────────────────────────────────────────────
 
 add_filter( 'cron_schedules', function ( $schedules ) {
