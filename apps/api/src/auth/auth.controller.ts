@@ -99,6 +99,13 @@ export class AuthController {
 
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
+  @Post('test-email')
+  testEmail(@CurrentUser() user: any, @Body() body: { to?: string }) {
+    return this.authService.testEmail(user.userId, body.to);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @UsePipes(new ValidationPipe({ whitelist: false, transform: true }))
   @Patch('settings')
   updateSettings(@CurrentUser() user: any, @Body() dto: Record<string, any>) {

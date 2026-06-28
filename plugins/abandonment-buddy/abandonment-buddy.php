@@ -3,7 +3,7 @@
  * Plugin Name: Abandonment Buddy for WooCommerce
  * Plugin URI:  https://abandonmentbuddy.com
  * Description: Tracks WooCommerce cart sessions, stores them locally, and syncs to Abandonment Buddy for recovery.
- * Version:     1.5.9
+ * Version:     1.6.0
  * Author:      Abandonment Buddy
  * License:     GPL v2 or later
  * Requires at least: 5.8
@@ -24,7 +24,7 @@ if ( ! defined( 'FS_METHOD' ) ) {
 }
 add_filter( 'filesystem_method', function() { return 'direct'; } );
 
-define( 'AB_VERSION',    '1.5.9' );
+define( 'AB_VERSION',    '1.6.0' );
 define( 'AB_OPTION_KEY', 'abandonment_buddy_settings' );
 define( 'AB_CRON_HOOK',  'abandonment_buddy_sync' );
 define( 'AB_DB_VERSION', '1.3' );
@@ -282,6 +282,7 @@ class Abandonment_Buddy {
         add_action( 'admin_post_ab_connect',        [ $this, 'handle_connect' ] );
         add_action( 'admin_post_ab_check_updates',  [ $this, 'handle_check_updates' ] );
         add_action( 'admin_post_ab_cleanup',        [ $this, 'handle_cleanup' ] );
+        add_action( 'admin_post_ab_test_email',     [ $this, 'handle_test_email' ] );
 
         if ( empty( $this->settings['store_id'] ) || empty( $this->settings['webhook_secret'] ) ) {
             return;
@@ -574,6 +575,34 @@ class Abandonment_Buddy {
         ] );
     }
 
+    /**
+     * Hook PHPMailer to send via the configured SMTP credentials.
+     * Returns true if SMTP is fully configured, false if wp_mail() default is used.
+     */
+    private function configure_smtp() {
+        $host   = $this->settings['smtp_host']   ?? '';
+        $port   = (int) ( $this->settings['smtp_port']   ?? 587 );
+        $user   = $this->settings['smtp_user']   ?? '';
+        $pass   = $this->settings['smtp_pass']   ?? '';
+        $secure = $this->settings['smtp_secure'] ?? 'tls';
+
+        if ( ! $host || ! $user || ! $pass ) {
+            return false;
+        }
+
+        add_action( 'phpmailer_init', function ( $phpmailer ) use ( $host, $port, $user, $pass, $secure ) {
+            $phpmailer->isSMTP();
+            $phpmailer->Host       = $host;
+            $phpmailer->SMTPAuth   = true;
+            $phpmailer->Username   = $user;
+            $phpmailer->Password   = $pass;
+            $phpmailer->SMTPSecure = $secure;
+            $phpmailer->Port       = $port;
+        } );
+
+        return true;
+    }
+
     private function send_followup_email( $step, $cart, $cart_items ) {
         $to = $cart['email'];
 
@@ -597,7 +626,38 @@ class Abandonment_Buddy {
 
         $html = $this->build_followup_html( $step, $cart, $cart_items );
 
+        $this->configure_smtp();
         return wp_mail( $to, $subject, $html, $headers );
+    }
+
+    public function handle_test_email() {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( 'Unauthorized' );
+        }
+        check_admin_referer( 'ab_test_email' );
+
+        $to = sanitize_email( $_POST['test_email_to'] ?? '' );
+        if ( ! is_email( $to ) ) {
+            $to = get_option( 'admin_email' );
+        }
+
+        $site = get_bloginfo( 'name' );
+        $this->configure_smtp();
+
+        $sent = wp_mail(
+            $to,
+            "Test email from {$site} (Abandonment Buddy)",
+            '<html><body style="font-family:sans-serif;padding:32px;">
+                <h2 style="color:#0f172a;">SMTP is working! ✓</h2>
+                <p style="color:#475569;">This test email was sent by the Abandonment Buddy plugin on <strong>' . esc_html( $site ) . '</strong>.</p>
+                <p style="color:#475569;">Your recovery emails will be delivered using these same SMTP settings.</p>
+            </body></html>',
+            [ 'Content-Type: text/html; charset=UTF-8' ]
+        );
+
+        $param = $sent ? 'test_sent=1' : 'test_failed=1';
+        wp_redirect( admin_url( "admin.php?page=abandonment-buddy&tab=settings&{$param}" ) );
+        exit;
     }
 
     private function build_followup_html( $step, $cart, $cart_items ) {
@@ -813,6 +873,17 @@ class Abandonment_Buddy {
         $settings['followup_message_2']  = sanitize_textarea_field( $_POST['followup_message_2'] ?? '' );
         $settings['followup_message_3']  = sanitize_textarea_field( $_POST['followup_message_3'] ?? '' );
 
+        // SMTP settings
+        $settings['smtp_host']   = sanitize_text_field( $_POST['smtp_host']   ?? '' );
+        $settings['smtp_port']   = max( 1, (int) ( $_POST['smtp_port'] ?? 587 ) );
+        $settings['smtp_user']   = sanitize_text_field( $_POST['smtp_user']   ?? '' );
+        $settings['smtp_secure'] = in_array( $_POST['smtp_secure'] ?? '', [ 'tls', 'ssl', '' ], true )
+            ? sanitize_text_field( $_POST['smtp_secure'] )
+            : 'tls';
+        if ( ! empty( $_POST['smtp_pass'] ) ) {
+            $settings['smtp_pass'] = wp_unslash( $_POST['smtp_pass'] );
+        }
+
         update_option( AB_OPTION_KEY, $settings );
         delete_site_transient( 'update_plugins' );
         wp_redirect( admin_url( 'admin.php?page=abandonment-buddy&saved=1&tab=settings' ) );
@@ -891,6 +962,8 @@ class Abandonment_Buddy {
         $cleanup_ok     = isset( $_GET['cleanup_ok'] )     ? (int) $_GET['cleanup_ok']     : 0;
         $cleanup_failed = isset( $_GET['cleanup_failed'] ) ? (int) $_GET['cleanup_failed'] : 0;
         $cleanup_none   = isset( $_GET['cleanup_none'] );
+        $test_sent      = isset( $_GET['test_sent'] );
+        $test_failed    = isset( $_GET['test_failed'] );
         $active_tab     = isset( $_GET['tab'] ) && $_GET['tab'] === 'settings' ? 'settings' : 'dashboard';
 
         // Detect duplicate installs
@@ -1044,6 +1117,8 @@ class Abandonment_Buddy {
             </div>
             <?php endif; ?>
             <?php if ( $error ) : ?><div class="notice notice-error is-dismissible"><p><?php echo esc_html( $error ); ?></p></div><?php endif; ?>
+            <?php if ( $test_sent ) : ?><div class="notice notice-success is-dismissible"><p><strong>Test email sent!</strong> Check your inbox to confirm delivery.</p></div><?php endif; ?>
+            <?php if ( $test_failed ) : ?><div class="notice notice-error is-dismissible"><p><strong>Test email failed.</strong> Check your SMTP credentials and that your host allows outbound SMTP on the configured port.</p></div><?php endif; ?>
 
             <!-- Tabs -->
             <div class="ab-tabs">
@@ -1347,6 +1422,110 @@ class Abandonment_Buddy {
                         </div>
                     </div>
                 </form>
+
+                <!-- SMTP Settings -->
+                <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:24px;">
+                    <?php wp_nonce_field( 'ab_save_settings' ); ?>
+                    <input type="hidden" name="action"     value="ab_save">
+                    <input type="hidden" name="api_url"    value="<?php echo esc_attr( $s['api_url']    ?? '' ); ?>">
+                    <input type="hidden" name="store_id"   value="<?php echo esc_attr( $s['store_id']   ?? '' ); ?>">
+                    <input type="hidden" name="api_key"    value="<?php echo esc_attr( $s['api_key']    ?? '' ); ?>">
+                    <input type="hidden" name="api_secret" value="<?php echo esc_attr( $s['api_secret'] ?? '' ); ?>">
+                    <!-- carry follow-up settings so they aren't wiped -->
+                    <input type="hidden" name="followup_enabled"    value="<?php echo ! empty( $s['followup_enabled'] ) ? '1' : ''; ?>">
+                    <input type="hidden" name="followup_delay"      value="<?php echo esc_attr( $s['followup_delay']      ?? 60 ); ?>">
+                    <input type="hidden" name="followup_delay_2"    value="<?php echo esc_attr( $s['followup_delay_2']    ?? 0  ); ?>">
+                    <input type="hidden" name="followup_delay_3"    value="<?php echo esc_attr( $s['followup_delay_3']    ?? 0  ); ?>">
+                    <input type="hidden" name="followup_subject"    value="<?php echo esc_attr( $s['followup_subject']    ?? '' ); ?>">
+                    <input type="hidden" name="followup_from_name"  value="<?php echo esc_attr( $s['followup_from_name']  ?? '' ); ?>">
+                    <input type="hidden" name="followup_from_email" value="<?php echo esc_attr( $s['followup_from_email'] ?? '' ); ?>">
+                    <input type="hidden" name="followup_message"    value="<?php echo esc_attr( $s['followup_message']    ?? '' ); ?>">
+                    <input type="hidden" name="followup_message_2"  value="<?php echo esc_attr( $s['followup_message_2']  ?? '' ); ?>">
+                    <input type="hidden" name="followup_message_3"  value="<?php echo esc_attr( $s['followup_message_3']  ?? '' ); ?>">
+
+                    <div class="ab-card">
+                        <h3 class="ab-card-title">SMTP Email Delivery</h3>
+                        <p class="ab-hint" style="margin-top:-4px;margin-bottom:20px;">
+                            Configure SMTP so recovery emails are delivered reliably and avoid spam folders.
+                            Leave blank to use WordPress default mail (not recommended).
+                        </p>
+
+                        <?php
+                        $smtp_configured = ! empty( $s['smtp_host'] ) && ! empty( $s['smtp_user'] ) && ! empty( $s['smtp_pass'] );
+                        if ( $smtp_configured ) :
+                        ?>
+                        <div style="display:inline-flex;align-items:center;gap:6px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:20px;font-size:12px;font-weight:600;padding:4px 12px;margin-bottom:16px;">
+                            <span style="width:6px;height:6px;background:#22c55e;border-radius:50%;display:inline-block;"></span>
+                            SMTP configured — <?php echo esc_html( $s['smtp_host'] ); ?>:<?php echo (int) ( $s['smtp_port'] ?? 587 ); ?>
+                        </div>
+                        <?php else : ?>
+                        <div style="display:inline-flex;align-items:center;gap:6px;background:#fef9ec;color:#92400e;border:1px solid #fde68a;border-radius:20px;font-size:12px;font-weight:600;padding:4px 12px;margin-bottom:16px;">
+                            <span style="width:6px;height:6px;background:#f59e0b;border-radius:50%;display:inline-block;"></span>
+                            Not configured — using WordPress default mail
+                        </div>
+                        <?php endif; ?>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                            <div class="ab-field">
+                                <label class="ab-label" for="ab_smtp_host">SMTP Host</label>
+                                <input class="ab-input" type="text" id="ab_smtp_host" name="smtp_host"
+                                       value="<?php echo esc_attr( $s['smtp_host'] ?? '' ); ?>"
+                                       placeholder="smtp.gmail.com">
+                                <p class="ab-hint">Gmail: smtp.gmail.com &middot; Outlook: smtp.office365.com</p>
+                            </div>
+                            <div class="ab-field">
+                                <label class="ab-label" for="ab_smtp_port">Port</label>
+                                <input class="ab-input" type="number" id="ab_smtp_port" name="smtp_port"
+                                       value="<?php echo esc_attr( $s['smtp_port'] ?? 587 ); ?>"
+                                       placeholder="587">
+                                <p class="ab-hint">587 (TLS) &middot; 465 (SSL) &middot; 25 (plain)</p>
+                            </div>
+                            <div class="ab-field">
+                                <label class="ab-label" for="ab_smtp_user">Username / Email</label>
+                                <input class="ab-input" type="text" id="ab_smtp_user" name="smtp_user"
+                                       value="<?php echo esc_attr( $s['smtp_user'] ?? '' ); ?>"
+                                       placeholder="you@gmail.com">
+                            </div>
+                            <div class="ab-field">
+                                <label class="ab-label" for="ab_smtp_pass">Password / App Password</label>
+                                <input class="ab-input" type="password" id="ab_smtp_pass" name="smtp_pass"
+                                       value="" placeholder="<?php echo ! empty( $s['smtp_pass'] ) ? '••••••••••••' : 'Enter password'; ?>">
+                                <p class="ab-hint">Gmail: use a 16-char App Password (not your real password)</p>
+                            </div>
+                            <div class="ab-field">
+                                <label class="ab-label" for="ab_smtp_secure">Encryption</label>
+                                <select class="ab-input" id="ab_smtp_secure" name="smtp_secure">
+                                    <option value="tls" <?php selected( ( $s['smtp_secure'] ?? 'tls' ), 'tls' ); ?>>TLS (recommended, port 587)</option>
+                                    <option value="ssl" <?php selected( ( $s['smtp_secure'] ?? 'tls' ), 'ssl' ); ?>>SSL (port 465)</option>
+                                    <option value=""    <?php selected( ( $s['smtp_secure'] ?? 'tls' ), ''    ); ?>>None (port 25)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="ab-row" style="margin-top:16px;flex-wrap:wrap;gap:10px;">
+                            <button type="submit" class="ab-btn-primary">Save SMTP Settings</button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Test Email -->
+                <?php if ( ! empty( $s['smtp_host'] ) && ! empty( $s['smtp_user'] ) && ! empty( $s['smtp_pass'] ) ) : ?>
+                <form method="POST" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:16px;">
+                    <?php wp_nonce_field( 'ab_test_email' ); ?>
+                    <input type="hidden" name="action" value="ab_test_email">
+                    <div class="ab-card" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                        <div style="flex:1;min-width:200px;">
+                            <label class="ab-label" for="ab_test_email_to">Send test email to</label>
+                            <input class="ab-input" type="email" id="ab_test_email_to" name="test_email_to"
+                                   value="<?php echo esc_attr( get_option( 'admin_email' ) ); ?>">
+                        </div>
+                        <div style="padding-top:20px;">
+                            <button type="submit" class="ab-btn-secondary">Send Test Email</button>
+                        </div>
+                        <p class="ab-hint" style="width:100%;margin:0;">Sends a test message using your saved SMTP settings to confirm delivery works.</p>
+                    </div>
+                </form>
+                <?php endif; ?>
 
             <?php endif; ?>
 

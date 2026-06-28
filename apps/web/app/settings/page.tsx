@@ -74,6 +74,8 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>('email');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testTo, setTestTo] = useState('');
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
   // Email
@@ -112,6 +114,20 @@ export default function SettingsPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  const sendTestEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTesting(true);
+    setStatus(null);
+    try {
+      const res = await api.post<{ sentTo: string }>('/auth/test-email', { to: testTo || undefined });
+      setStatus({ type: 'success', msg: `Test email sent to ${res.data.sentTo} — check your inbox.` });
+    } catch (err) {
+      setStatus({ type: 'error', msg: getApiErrorMessage(err, 'Failed to send test email') });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const saveEmail = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -260,6 +276,35 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </form>
+
+              {/* Test email */}
+              {smtpUser && (
+                <form onSubmit={sendTestEmail} className="mt-5 border-t border-slate-100 pt-5">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Send a test email</p>
+                  <div className="flex gap-3 items-end">
+                    <div className="flex-1">
+                      <Field label="Send test to">
+                        <input
+                          type="email"
+                          value={testTo}
+                          onChange={e => setTestTo(e.target.value)}
+                          placeholder="your@email.com"
+                          className={inputCls}
+                        />
+                      </Field>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={testing}
+                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {testing ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+                      {testing ? 'Sending…' : 'Send test'}
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-xs text-slate-400">Sends a test email using your saved SMTP settings to confirm delivery works.</p>
+                </form>
+              )}
             </div>
           )}
 

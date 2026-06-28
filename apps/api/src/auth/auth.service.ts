@@ -242,6 +242,46 @@ export class AuthService {
     };
   }
 
+  async testEmail(userId: string, to?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException();
+
+    const host     = user.smtpHost   || process.env.SMTP_HOST;
+    const port     = user.smtpPort   || Number(process.env.SMTP_PORT) || 587;
+    const secure   = user.smtpSecure ?? (process.env.SMTP_SECURE === 'true');
+    const smtpUser = user.smtpUser   || process.env.SMTP_USER;
+    const smtpPass = user.smtpPass   || process.env.SMTP_PASS;
+    const from     = user.smtpFrom   || smtpUser;
+
+    if (!host || !smtpUser || !smtpPass) {
+      throw new BadRequestException('SMTP not configured. Save your credentials in Settings → Email first.');
+    }
+
+    const recipient = to && to.includes('@') ? to : user.email;
+
+    const transporter = nodemailer.createTransport({
+      host, port, secure,
+      auth: { user: smtpUser, pass: smtpPass },
+      tls: { rejectUnauthorized: false },
+    });
+
+    await transporter.sendMail({
+      from: `"Abandonment Buddy" <${from}>`,
+      to: recipient,
+      subject: 'SMTP test — Abandonment Buddy',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px;">
+          <h2 style="color:#0f172a;margin-bottom:8px;">SMTP is working ✓</h2>
+          <p style="color:#475569;">This test email was sent from your Abandonment Buddy dashboard.</p>
+          <p style="color:#475569;">Your cart recovery emails will be delivered using these same SMTP settings.</p>
+          <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+          <p style="color:#94a3b8;font-size:12px;">Sent via ${host}:${port}</p>
+        </div>`,
+    });
+
+    return { success: true, sentTo: recipient };
+  }
+
   async updateSettings(userId: string, dto: any) {
     const data: any = {};
 
