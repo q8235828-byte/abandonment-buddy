@@ -5,9 +5,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { PrismaService } from '../prisma/prisma.service';
 
-const PLUGIN_DIR  = path.resolve(__dirname, '../../../../plugins/abandonment-buddy');
-const PLUGIN_FILE = path.join(PLUGIN_DIR, 'abandonment-buddy.php');
-const README_FILE = path.join(PLUGIN_DIR, 'readme.txt');
+const PLUGIN_DIR   = path.resolve(__dirname, '../../../../plugins/abandonment-buddy');
+const PLUGIN_FILE  = path.join(PLUGIN_DIR, 'abandonment-buddy.php');
+const README_FILE  = path.join(PLUGIN_DIR, 'readme.txt');
+const GITHUB_REPO  = process.env.GITHUB_REPO ?? 'q8235828-byte/abandonment-buddy';
 
 function readPluginVersion(): string {
   try {
@@ -36,12 +37,13 @@ export class PluginController {
   }
 
   @Get('info')
-  getInfo(@Req() req: Request) {
+  getInfo() {
+    const version = readPluginVersion();
     return {
       name:          'Abandonment Buddy for WooCommerce',
       slug:          'abandonment-buddy',
-      version:       readPluginVersion(),
-      download_url:  `${this.baseUrl(req)}/plugin/download`,
+      version,
+      download_url:  `https://github.com/${GITHUB_REPO}/releases/download/v${version}/abandonment-buddy.zip`,
       changelog:     readChangelog(),
       requires:      '5.8',
       requires_php:  '7.0',
